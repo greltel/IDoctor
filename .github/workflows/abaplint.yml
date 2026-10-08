@@ -1,0 +1,16 @@
+name: abaplint
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  abaplint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Lint with syntax version v750
+        run: npx --yes @abaplint/cli@2.120.70 .abaplint.json
