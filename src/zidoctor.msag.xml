@@ -1,0 +1,266 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<abapGit version="v1.0.0" serializer="LCL_OBJECT_MSAG" serializer_version="v1.0.0">
+ <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+  <asx:values>
+   <T100A>
+    <ARBGB>ZIDOCTOR</ARBGB>
+    <MASTERLANG>E</MASTERLANG>
+    <STEXT>IDoctor - IDocs as object trees</STEXT>
+   </T100A>
+   <T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>001</MSGNR>
+     <TEXT>Segment type &amp;1 is not defined in IDoc type &amp;2</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>002</MSGNR>
+     <TEXT>Record &amp;1 (&amp;2) has no parent segment &amp;3 before it</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>003</MSGNR>
+     <TEXT>Segment &amp;1 belongs under &amp;2, not under &amp;3</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>004</MSGNR>
+     <TEXT>Segment &amp;1 occurs &amp;2 times under &amp;3 already; at most &amp;4 are allowed</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>005</MSGNR>
+     <TEXT>Segment &amp;1 cannot go next to &amp;2: the IDoc type orders them differently</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>006</MSGNR>
+     <TEXT>Field &amp;1 is not defined for segment &amp;2</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>007</MSGNR>
+     <TEXT>Value &amp;1 does not fit into field &amp;2 (&amp;3 characters)</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>008</MSGNR>
+     <TEXT>Type &amp;1 does not fit segment &amp;2: char-like, max. 1000 characters</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>009</MSGNR>
+     <TEXT>Structure &amp;1 does not belong to segment &amp;2</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>010</MSGNR>
+     <TEXT>IDoc type &amp;1 &amp;2 does not match the syntax of &amp;3 &amp;4</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>011</MSGNR>
+     <TEXT>Segment &amp;1 is no longer part of the IDoc</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>012</MSGNR>
+     <TEXT>No segment &amp;1 with &amp;2 = &amp;3 found</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>013</MSGNR>
+     <TEXT>The syntax of IDoc type &amp;1 contains no segments</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>014</MSGNR>
+     <TEXT>EDIDD data expected: the table must have line type EDIDD</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>015</MSGNR>
+     <TEXT>No segment &amp;1 found</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>020</MSGNR>
+     <TEXT>Segment &amp;1 occurs &amp;2 times under &amp;3; at least &amp;4 required</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>021</MSGNR>
+     <TEXT>Segment &amp;1 occurs &amp;2 times under &amp;3; at most &amp;4 allowed</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>022</MSGNR>
+     <TEXT>Segment &amp;1 &amp;2 is out of order: the IDoc type puts it before &amp;3</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>030</MSGNR>
+     <TEXT>IDoc &amp;1 does not exist</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>031</MSGNR>
+     <TEXT>IDoc number &amp;1 is not valid</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>032</MSGNR>
+     <TEXT>IDoc type &amp;1 (extension &amp;2) does not exist</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>033</MSGNR>
+     <TEXT>Extension &amp;2 is not assigned to IDoc type &amp;1</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>034</MSGNR>
+     <TEXT>A segment of IDoc type &amp;1 could not be read</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>035</MSGNR>
+     <TEXT>IDoc &amp;1 is locked by another user</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>036</MSGNR>
+     <TEXT>IDoc &amp;1 may not be changed in its current status</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>037</MSGNR>
+     <TEXT>IDoc &amp;1 is not open for changes</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>038</MSGNR>
+     <TEXT>IDoc &amp;1: segments added, removed or moved; only contents can be saved</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>039</MSGNR>
+     <TEXT>The IDoc has no number; only an IDoc loaded from the database is saved</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>041</MSGNR>
+     <TEXT>IDoc &amp;1 could not be written to the database</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>042</MSGNR>
+     <TEXT>IDoc &amp;1 could not be read (sy-subrc &amp;2)</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>043</MSGNR>
+     <TEXT>Syntax of IDoc type &amp;1 could not be read (sy-subrc &amp;2)</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>044</MSGNR>
+     <TEXT>IDoc &amp;1 could not be opened for changes (sy-subrc &amp;2)</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>045</MSGNR>
+     <TEXT>Segments of IDoc &amp;1 could not be changed (sy-subrc &amp;2)</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>046</MSGNR>
+     <TEXT>IDoc &amp;1 could not be closed after changes (sy-subrc &amp;2)</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>047</MSGNR>
+     <TEXT>IDoc &amp;1 to be changed does not exist</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>048</MSGNR>
+     <TEXT>IDoc &amp;1 was no longer open for changes when it was closed</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>049</MSGNR>
+     <TEXT>IDoc &amp;1: a changed data record does not exist in the database</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>050</MSGNR>
+     <TEXT>IDoc &amp;1 was changed after it was loaded; load it again</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>060</MSGNR>
+     <TEXT>IDoc &amp;1 saved</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>061</MSGNR>
+     <TEXT>&amp;1 segment(s) changed and saved</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>062</MSGNR>
+     <TEXT>Test mode: &amp;1 segment(s) would be changed; nothing saved</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>063</MSGNR>
+     <TEXT>Nothing to change: no segment &amp;1 with &amp;2 = &amp;3</TEXT>
+    </T100>
+   </T100>
+  </asx:values>
+ </asx:abap>
+</abapGit>
