@@ -8,7 +8,6 @@
     <SUBC>1</SUBC>
     <FIXPT>X</FIXPT>
     <LDBNAME>D$S</LDBNAME>
-    <UCCHECK>X</UCCHECK>
    </PROGDIR>
    <TPOOL>
     <item>

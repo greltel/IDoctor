@@ -104,7 +104,6 @@ CLASS ltc_repository IMPLEMENTATION.
 
 
   METHOD given_no_idoc_load_raises.
-    " verify in ADT: name and form of the parameter of then_raise_classic_exception( )
     function_modules->get_double( 'IDOC_READ_COMPLETELY' )->configure_call(
       )->ignore_all_parameters(
       )->then_raise_classic_exception( 'DOCUMENT_NOT_EXIST' ).
@@ -192,7 +191,6 @@ CLASS ltc_repository IMPLEMENTATION.
     DATA(expected_change) = change->create_input_configuration(
       )->set_table_parameter( name  = 'IDOC_CHANGED_DATA_RANGE'
                               value = VALUE zcl_idoctor=>ty_data_records( ( expected_record ) ) ).
-    " verify in ADT: verify( ) with an input configuration compares the configured parameters
     change->verify( expected_change )->is_called_once( ).
   ENDMETHOD.
 
@@ -370,7 +368,6 @@ CLASS ltc_repository IMPLEMENTATION.
                                   value = update
       )->set_importing_parameter( name  = 'DO_COMMIT'
                                   value = commit ).
-    " verify in ADT: verify( ) with an input configuration compares the configured parameters
     close->verify( expected_close )->is_called_once( ).
   ENDMETHOD.
 

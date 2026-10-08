@@ -8,13 +8,18 @@
     <SUBC>1</SUBC>
     <FIXPT>X</FIXPT>
     <LDBNAME>D$S</LDBNAME>
-    <UCCHECK>X</UCCHECK>
    </PROGDIR>
    <TPOOL>
     <item>
      <ID>R</ID>
      <ENTRY>IDoctor demo 04: change EDIDD in a user exit</ENTRY>
      <LENGTH>44</LENGTH>
+    </item>
+    <item>
+     <ID>S</ID>
+     <KEY>P_DOCNUM</KEY>
+     <ENTRY>IDoc number (ORDERS)</ENTRY>
+     <LENGTH>28</LENGTH>
     </item>
    </TPOOL>
   </asx:values>
