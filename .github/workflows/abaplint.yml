@@ -13,4 +13,4 @@ jobs:
         with:
           node-version: 20
       - name: Lint with syntax version v750
-        run: npx --yes @abaplint/cli@2.120.70 .abaplint.json
+        run: npx --yes @abaplint/cli@2.120.70 abaplint.json
