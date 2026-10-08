@@ -41,6 +41,7 @@ CLASS zcl_idoctor_repository DEFINITION
         foreign_lock   TYPE sysubrc VALUE 1,
         not_existing   TYPE sysubrc VALUE 2,
         not_changeable TYPE sysubrc VALUE 4,
+        sap_message    TYPE sysubrc VALUE 5,
       END OF open_failure.
     CONSTANTS:
       BEGIN OF change_failure,
@@ -49,8 +50,9 @@ CLASS zcl_idoctor_repository DEFINITION
       END OF change_failure.
     CONSTANTS:
       BEGIN OF close_failure,
-        not_open TYPE sysubrc VALUE 1,
-        db_error TYPE sysubrc VALUE 2,
+        not_open    TYPE sysubrc VALUE 1,
+        db_error    TYPE sysubrc VALUE 2,
+        sap_message TYPE sysubrc VALUE 3,
       END OF close_failure.
 
     " syntaxes read so far, by IDoc type and extension
@@ -151,7 +153,9 @@ CLASS zcl_idoctor_repository DEFINITION
 ENDCLASS.
 
 
-CLASS zcl_idoctor_repository IMPLEMENTATION.
+
+CLASS ZCL_IDOCTOR_REPOSITORY IMPLEMENTATION.
+
 
   METHOD zif_idoctor_repository~read_syntax.
     DATA(type_name) = CONV edidc-idoctp( to_upper( idoc_type ) ).
@@ -196,17 +200,15 @@ CLASS zcl_idoctor_repository IMPLEMENTATION.
 
   METHOD read_type.
     DATA segment_rows TYPE ty_segment_rows.
-    DATA field_rows TYPE STANDARD TABLE OF edi_iapi12 WITH EMPTY KEY.
 
-    " PT_FIELDS is passed in case the interface requires it; the field layout is taken from the
-    " DDIC structure of each segment type (fields_of), the layout SDATA really has
+    " PT_FIELDS is not requested: the field layout comes from the DDIC structure of each segment
+    " type (fields_of), the layout SDATA really has
     CALL FUNCTION 'IDOCTYPE_READ_COMPLETE'
       EXPORTING
         pi_idoctyp         = idoc_type
         pi_cimtyp          = extension
       TABLES
         pt_segments        = segment_rows
-        pt_fields          = field_rows
       EXCEPTIONS
         object_unknown     = 1
         segment_unknown    = 2
@@ -379,7 +381,8 @@ CLASS zcl_idoctor_repository IMPLEMENTATION.
         document_not_exist            = 2
         document_not_open             = 3
         status_is_unable_for_changing = 4
-        OTHERS                        = 5.
+        error_message                 = 5
+        OTHERS                        = 6.
     IF sy-subrc <> 0.
       raise_open_error( failure = sy-subrc
                         docnum  = docnum ).
@@ -417,7 +420,8 @@ CLASS zcl_idoctor_repository IMPLEMENTATION.
       EXCEPTIONS
         idoc_not_open   = 1
         db_error        = 2
-        OTHERS          = 3.
+        error_message   = 3
+        OTHERS          = 4.
     IF sy-subrc <> 0.
       raise_close_error( failure = sy-subrc
                          docnum  = docnum ).
@@ -438,7 +442,8 @@ CLASS zcl_idoctor_repository IMPLEMENTATION.
       TABLES
         status_records  = status_records
       EXCEPTIONS
-        OTHERS          = 1.
+        error_message   = 1
+        OTHERS          = 2.
   ENDMETHOD.
 
 
@@ -479,6 +484,11 @@ CLASS zcl_idoctor_repository IMPLEMENTATION.
         RAISE EXCEPTION TYPE zcx_idoctor_error MESSAGE e047(zidoctor) WITH docnum.
       WHEN open_failure-not_changeable.
         RAISE EXCEPTION TYPE zcx_idoctor_error MESSAGE e036(zidoctor) WITH docnum.
+      WHEN open_failure-sap_message.
+        " the lock or another step of the IDoc interface sent its own message - pass it on
+        RAISE EXCEPTION TYPE zcx_idoctor_error
+          MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+          WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
       WHEN OTHERS.
         RAISE EXCEPTION TYPE zcx_idoctor_error MESSAGE e044(zidoctor) WITH docnum failure_text.
     ENDCASE.
@@ -505,10 +515,12 @@ CLASS zcl_idoctor_repository IMPLEMENTATION.
         RAISE EXCEPTION TYPE zcx_idoctor_error MESSAGE e048(zidoctor) WITH docnum.
       WHEN close_failure-db_error.
         RAISE EXCEPTION TYPE zcx_idoctor_error MESSAGE e041(zidoctor) WITH docnum.
+      WHEN close_failure-sap_message.
+        RAISE EXCEPTION TYPE zcx_idoctor_error
+          MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+          WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
       WHEN OTHERS.
         RAISE EXCEPTION TYPE zcx_idoctor_error MESSAGE e046(zidoctor) WITH docnum failure_text.
     ENDCASE.
   ENDMETHOD.
-
 ENDCLASS.
-
