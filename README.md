@@ -362,7 +362,7 @@ Issues and pull requests are welcome.
 - New code follows [Clean ABAP](https://github.com/SAP/styleguides/blob/main/clean-abap/CleanABAP.md),
   documents every public declaration with ABAP Doc, and comes with ABAP Unit tests.
 - The code must activate on ABAP 7.50. [abaplint](https://abaplint.org) checks this on every
-  push and pull request (`.abaplint.json`, syntax version `v750`). To run it locally:
+  push and pull request (`abaplint.json`, syntax version `v750`). To run it locally:
   `npx @abaplint/cli .abaplint.json`.
 
 ## Credits
