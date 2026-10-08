@@ -45,6 +45,12 @@
      <ENTRY>Segment type</ENTRY>
      <LENGTH>20</LENGTH>
     </item>
+    <item>
+     <ID>S</ID>
+     <KEY>P_TEST</KEY>
+     <ENTRY>Test mode (no save)</ENTRY>
+     <LENGTH>27</LENGTH>
+    </item>
    </TPOOL>
   </asx:values>
  </asx:abap>
