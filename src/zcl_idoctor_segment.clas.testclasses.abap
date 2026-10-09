@@ -65,6 +65,11 @@ CLASS ltc_segment DEFINITION FINAL FOR TESTING
     METHODS when_removed_then_gone FOR TESTING RAISING cx_static_check.
     METHODS given_removed_add_raises FOR TESTING RAISING cx_static_check.
     METHODS when_found_below_then_own FOR TESTING RAISING cx_static_check.
+    METHODS when_values_chained_then_set FOR TESTING RAISING cx_static_check.
+    METHODS when_data_set_then_self FOR TESTING RAISING cx_static_check.
+    METHODS when_added_then_renumbered FOR TESTING RAISING cx_static_check.
+    METHODS given_removed_number_raises FOR TESTING RAISING cx_static_check.
+    METHODS when_found_below_without_type FOR TESTING RAISING cx_static_check.
 ENDCLASS.
 
 
@@ -249,6 +254,69 @@ CLASS ltc_segment IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = texts[ 1 ]->get_value( 'TDLINE' )
                                         exp = `first`
                                         msg = `The text found must be the one of this item` ).
+  ENDMETHOD.
+
+
+  METHOD when_values_chained_then_set.
+    item->set_value( field = 'POSNR'
+                     value = '000010'
+      )->set_value( field = 'MATNR'
+                    value = 'MAT-A' ).
+
+    cl_abap_unit_assert=>assert_equals( act = |{ item->get_value( 'POSNR' ) } { item->get_value( 'MATNR' ) }|
+                                        exp = `000010 MAT-A`
+                                        msg = `Each call of a chain must write its field` ).
+  ENDMETHOD.
+
+
+  METHOD when_data_set_then_self.
+    DATA(returned) = item->set_data( VALUE ty_item( posnr = '000010' ) ).
+
+    cl_abap_unit_assert=>assert_equals( act = returned
+                                        exp = item
+                                        msg = `set_data( ) must return the segment itself` ).
+  ENDMETHOD.
+
+
+  METHOD when_added_then_renumbered.
+    DATA(text) = item->add( 'Z1ITEMTEXT' ).
+    cl_abap_unit_assert=>assert_equals( act = text->number( )
+                                        exp = '000002'
+                                        msg = `The first child of the first segment must be number 2` ).
+
+    " the head goes in front of the item, so everything behind it moves up by one
+    idoc->add( 'Z1HEAD' ).
+
+    cl_abap_unit_assert=>assert_equals( act = text->number( )
+                                        exp = '000003'
+                                        msg = `A segment added in front must renumber the text` ).
+  ENDMETHOD.
+
+
+  METHOD given_removed_number_raises.
+    item->remove( ).
+
+    TRY.
+        item->number( ).
+        cl_abap_unit_assert=>fail( msg = `A removed segment must have no number` ).
+      CATCH zcx_idoctor_error INTO DATA(error).
+        cl_abap_unit_assert=>assert_equals( act = error->if_t100_message~t100key-msgno
+                                            exp = '011'
+                                            msg = `Wrong error - expected: no longer part of the IDoc` ).
+    ENDTRY.
+  ENDMETHOD.
+
+
+  METHOD when_found_below_without_type.
+    DATA(text) = item->add( 'Z1ITEMTEXT' ).
+    DATA(schedule) = item->add( 'Z1SCHEDULE' ).
+    idoc->add( 'Z1ITEM' )->add( 'Z1ITEMTEXT' ).
+
+    DATA(below) = item->find_all( ).
+
+    cl_abap_unit_assert=>assert_equals( act = below
+                                        exp = VALUE zcl_idoctor=>ty_segments( ( text ) ( schedule ) )
+                                        msg = `find_all( ) without a type must list everything below, nothing else` ).
   ENDMETHOD.
 
 ENDCLASS.

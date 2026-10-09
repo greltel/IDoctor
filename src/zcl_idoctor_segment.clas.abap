@@ -30,6 +30,16 @@ CLASS zcl_idoctor_segment DEFINITION
     METHODS parent
       RETURNING VALUE(result) TYPE REF TO zcl_idoctor_segment.
 
+    "! Number of the segment - the SEGNUM that to_edidd( ) of its IDoc gives it now. It changes
+    "! when segments in front of it are added or removed; find_by_number( ) of the IDoc is the
+    "! way back from a number to the segment.
+    "!
+    "! @parameter result | Segment number, from 000001 in document order
+    "! @raising zcx_idoctor_error | The segment was removed
+    METHODS number
+      RETURNING VALUE(result) TYPE edidd-segnum
+      RAISING   zcx_idoctor_error.
+
     "! Child segments.
     "!
     "! @parameter name   | Only children of this segment type; all children when initial
@@ -52,11 +62,13 @@ CLASS zcl_idoctor_segment DEFINITION
     "!
     "! @parameter field | Field name, e.g. CURCY
     "! @parameter value | New content; must fit into the field
+    "! @parameter self  | This segment, so that further calls can be chained
     "! @raising zcx_idoctor_error | The field is not defined for the segment type, or the value
     "!                             is longer than the field
     METHODS set_value
-      IMPORTING field TYPE zcl_idoctor=>ty_field_name
-                value TYPE clike
+      IMPORTING field       TYPE zcl_idoctor=>ty_field_name
+                value       TYPE clike
+      RETURNING VALUE(self) TYPE REF TO zcl_idoctor_segment
       RAISING   zcx_idoctor_error.
 
     "! Reads the whole segment data into a structure, e.g. one typed with the DDIC structure of
@@ -73,9 +85,11 @@ CLASS zcl_idoctor_segment DEFINITION
     "!
     "! @parameter data | Character-like structure or field of at most 1000 characters; a DDIC
     "!                  structure must be the one of the segment type or of its definition
+    "! @parameter self | This segment, so that further calls can be chained
     "! @raising zcx_idoctor_error | The type of data does not fit the segment
     METHODS set_data
-      IMPORTING data TYPE any
+      IMPORTING data        TYPE any
+      RETURNING VALUE(self) TYPE REF TO zcl_idoctor_segment
       RAISING   zcx_idoctor_error.
 
     "! First segment below this one with the given type and, when a field is given, field value.
@@ -92,17 +106,21 @@ CLASS zcl_idoctor_segment DEFINITION
       RETURNING VALUE(result) TYPE REF TO zcl_idoctor_segment
       RAISING   zcx_idoctor_error.
 
-    "! All segments below this one with the given type and, when a field is given, field value.
+    "! All segments below this one with the given type and, when a field is given, field value -
+    "! without a type, every segment below this one.
     "!
-    "! @parameter name   | Segment type
-    "! @parameter field  | Field to compare; when initial, every segment of the type matches
+    "! @parameter name   | Segment type; when initial, every segment matches
+    "! @parameter field  | Field to compare, only together with a segment type; when initial,
+    "!                    every segment of the type matches
     "! @parameter value  | Content the field must have; compared without trailing blanks
     "! @parameter result | Matches in document order; empty when there is none
-    "! @raising zcx_idoctor_error | The segment type or field is not defined
+    "! @raising zcx_idoctor_error | The segment type or field is not defined, or a field is given
+    "!                             without a segment type
     METHODS find_all
-      IMPORTING name          TYPE zcl_idoctor=>ty_segment_type
+      IMPORTING name          TYPE zcl_idoctor=>ty_segment_type OPTIONAL
                 field         TYPE zcl_idoctor=>ty_field_name OPTIONAL
                 value         TYPE clike OPTIONAL
+      PREFERRED PARAMETER name
       RETURNING VALUE(result) TYPE zcl_idoctor=>ty_segments
       RAISING   zcx_idoctor_error.
 
@@ -163,7 +181,9 @@ CLASS zcl_idoctor_segment DEFINITION
 ENDCLASS.
 
 
-CLASS zcl_idoctor_segment IMPLEMENTATION.
+
+CLASS ZCL_IDOCTOR_SEGMENT IMPLEMENTATION.
+
 
   METHOD constructor.
     root = idoc.
@@ -210,6 +230,7 @@ CLASS zcl_idoctor_segment IMPLEMENTATION.
         MESSAGE e007(zidoctor) WITH value_text field_definition-field_name length_text.
     ENDIF.
     sdata+field_definition-offset(field_definition-length) = value.
+    self = me.
   ENDMETHOD.
 
 
@@ -225,6 +246,7 @@ CLASS zcl_idoctor_segment IMPLEMENTATION.
     root->check_data_type( data       = data
                            definition = definition ).
     sdata = data.
+    self = me.
   ENDMETHOD.
 
 
@@ -270,7 +292,7 @@ CLASS zcl_idoctor_segment IMPLEMENTATION.
 
 
   METHOD collect.
-    IF definition-segment_type = query-segment_type
+    IF ( query-segment_type IS INITIAL OR definition-segment_type = query-segment_type )
        AND ( query-field IS INITIAL OR sdata+query-field-offset(query-field-length) = query-value ).
       INSERT me INTO TABLE matches.
     ENDIF.
@@ -280,5 +302,8 @@ CLASS zcl_idoctor_segment IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
-ENDCLASS.
 
+  METHOD number.
+    result = root->number_of( me ).
+  ENDMETHOD.
+ENDCLASS.

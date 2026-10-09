@@ -101,6 +101,18 @@
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>016</MSGNR>
+     <TEXT>The IDoc has no segment number &amp;1</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>017</MSGNR>
+     <TEXT>Field &amp;1 can only be searched for within a segment type</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
      <MSGNR>020</MSGNR>
      <TEXT>Segment &amp;1 occurs &amp;2 times under &amp;3; at least &amp;4 required</TEXT>
     </T100>

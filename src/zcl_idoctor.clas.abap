@@ -125,6 +125,28 @@ CLASS zcl_idoctor DEFINITION
     METHODS to_edidd
       RETURNING VALUE(result) TYPE ty_data_records.
 
+    "! The IDoc as a flat file, the way a file port writes it: the control record as EDI_DC40,
+    "! then one EDI_DD40 data record per segment in document order, numbered as in to_edidd( ).
+    "! Every record is padded to its full length and followed by the line break. Data records
+    "! carry the segment definition (e.g. E2EDK01005) where the syntax knows it, otherwise the
+    "! segment type.
+    "!
+    "! @parameter line_break | Text after each record; LF when not supplied, empty for one
+    "!                        continuous block of fixed-length records
+    "! @parameter result     | File content
+    METHODS to_flat_file
+      IMPORTING line_break    TYPE string OPTIONAL
+      RETURNING VALUE(result) TYPE string.
+
+    "! The IDoc as IDoc-XML, the way an XML port writes it: a root element named after the
+    "! extension (the basic type when there is none) holding one IDOC element with the control
+    "! record as EDI_DC40 and one element per segment, children nested in their parent. Fields
+    "! with initial content are left out. A slash in a name becomes _- as SAP writes it.
+    "!
+    "! @parameter result | XML document, indented by two blanks per level, lines ended by LF
+    METHODS to_xml
+      RETURNING VALUE(result) TYPE string.
+
     "! @parameter result | Control record - for a loaded IDoc as read from the database
     METHODS control
       RETURNING VALUE(result) TYPE edidc.
@@ -151,18 +173,35 @@ CLASS zcl_idoctor DEFINITION
       RETURNING VALUE(result) TYPE REF TO zcl_idoctor_segment
       RAISING   zcx_idoctor_error.
 
-    "! All segments of the IDoc with the given type and, when a field is given, field value.
+    "! All segments of the IDoc with the given type and, when a field is given, field value -
+    "! without a type, every segment of the IDoc.
     "!
-    "! @parameter name   | Segment type
-    "! @parameter field  | Field to compare; when initial, every segment of the type matches
+    "! @parameter name   | Segment type; when initial, every segment matches
+    "! @parameter field  | Field to compare, only together with a segment type; when initial,
+    "!                    every segment of the type matches
     "! @parameter value  | Content the field must have; compared without trailing blanks
     "! @parameter result | Matches in document order; empty when there is none
-    "! @raising zcx_idoctor_error | The segment type or field is not defined
+    "! @raising zcx_idoctor_error | The segment type or field is not defined, or a field is given
+    "!                             without a segment type
     METHODS find_all
-      IMPORTING name          TYPE ty_segment_type
+      IMPORTING name          TYPE ty_segment_type OPTIONAL
                 field         TYPE ty_field_name OPTIONAL
                 value         TYPE clike OPTIONAL
+      PREFERRED PARAMETER name
       RETURNING VALUE(result) TYPE ty_segments
+      RAISING   zcx_idoctor_error.
+
+    "! Segment by its number, as to_edidd( ) numbers it now. SAP numbers the segments of an IDoc
+    "! from 000001 in document order, so for a loaded IDoc whose segments were not added, removed
+    "! or moved this is the SEGNUM in the database - e.g. the number a status record
+    "! (EDIDS-SEGNUM) gives for the segment an application error refers to.
+    "!
+    "! @parameter number | Segment number, e.g. 000017 or 17
+    "! @parameter result | The segment
+    "! @raising zcx_idoctor_error | No segment has that number
+    METHODS find_by_number
+      IMPORTING number        TYPE clike
+      RETURNING VALUE(result) TYPE REF TO zcl_idoctor_segment
       RAISING   zcx_idoctor_error.
 
     "! Adds a top-level segment where the syntax puts it: after the segments of its own type,
@@ -197,9 +236,15 @@ CLASS zcl_idoctor DEFINITION
         number  TYPE edidd-segnum,
       END OF ty_number.
     TYPES ty_numbers TYPE HASHED TABLE OF ty_number WITH UNIQUE KEY segment.
+    TYPES ty_field_definitions_by_offset TYPE SORTED TABLE OF ty_field_definition
+      WITH NON-UNIQUE KEY offset.
 
     " length of EDIDD-SDATA in characters
     CONSTANTS max_data_length TYPE i VALUE 1000.
+    " what TABNAM of a control record says in files and XML
+    CONSTANTS control_record_name TYPE edi_dc40-tabnam VALUE 'EDI_DC40'.
+    " blanks per level of indentation in to_xml( )
+    CONSTANTS xml_indentation TYPE i VALUE 2.
 
     DATA syntax TYPE ty_syntax.
     DATA control_record TYPE edidc.
@@ -285,8 +330,8 @@ CLASS zcl_idoctor DEFINITION
       RETURNING VALUE(result) TYPE REF TO zcl_idoctor_segment
       RAISING   zcx_idoctor_error.
 
-    " insert_next_to, remove_segment and check_data_type are called by zcl_idoctor_segment,
-    " which hands its structural changes and type checks to the IDoc
+    " insert_next_to, remove_segment, number_of and check_data_type are called by
+    " zcl_idoctor_segment, which hands its structural changes, numbering and type checks to the IDoc
     METHODS insert_next_to
       IMPORTING anchor        TYPE REF TO zcl_idoctor_segment
                 name          TYPE ty_segment_type
@@ -296,6 +341,11 @@ CLASS zcl_idoctor DEFINITION
 
     METHODS remove_segment
       IMPORTING segment TYPE REF TO zcl_idoctor_segment
+      RAISING   zcx_idoctor_error ##CALLED.
+
+    METHODS number_of
+      IMPORTING segment       TYPE REF TO zcl_idoctor_segment
+      RETURNING VALUE(result) TYPE edidd-segnum
       RAISING   zcx_idoctor_error ##CALLED.
 
     METHODS check_parent
@@ -335,10 +385,52 @@ CLASS zcl_idoctor DEFINITION
                 numbers       TYPE ty_numbers OPTIONAL
       RETURNING VALUE(result) TYPE string.
 
+    CLASS-METHODS fixed_width
+      IMPORTING record        TYPE any
+      RETURNING VALUE(result) TYPE string.
+
+    CLASS-METHODS xml_name
+      IMPORTING name          TYPE csequence
+      RETURNING VALUE(result) TYPE string.
+
+    CLASS-METHODS xml_element
+      IMPORTING name          TYPE csequence
+                value         TYPE csequence
+                level         TYPE i
+      RETURNING VALUE(result) TYPE string.
+
+    CLASS-METHODS indentation
+      IMPORTING level         TYPE i
+      RETURNING VALUE(result) TYPE string.
+
+    METHODS flat_control
+      RETURNING VALUE(result) TYPE edi_dc40.
+
+    METHODS flat_segment_name
+      IMPORTING segment_type  TYPE ty_segment_type
+      RETURNING VALUE(result) TYPE edi_dd40-segnam.
+
+    METHODS control_xml
+      IMPORTING level         TYPE i
+      RETURNING VALUE(result) TYPE string.
+
+    METHODS segments_xml
+      IMPORTING segments      TYPE ty_segments
+                level         TYPE i
+      RETURNING VALUE(result) TYPE string.
+
+    METHODS fields_xml
+      IMPORTING segment       TYPE REF TO zcl_idoctor_segment
+                level         TYPE i
+      RETURNING VALUE(result) TYPE string.
+
     METHODS append_records
       IMPORTING segments      TYPE ty_segments
                 parent_number TYPE edidd-psgnum OPTIONAL
       CHANGING  records       TYPE ty_data_records.
+
+    METHODS segment_numbers
+      RETURNING VALUE(result) TYPE ty_numbers.
 
     METHODS number_segments
       IMPORTING segments TYPE ty_segments
@@ -361,7 +453,9 @@ CLASS zcl_idoctor DEFINITION
 ENDCLASS.
 
 
-CLASS zcl_idoctor IMPLEMENTATION.
+
+CLASS ZCL_IDOCTOR IMPLEMENTATION.
+
 
   METHOD constructor.
     me->syntax = syntax.
@@ -428,11 +522,7 @@ CLASS zcl_idoctor IMPLEMENTATION.
 
 
   METHOD validate.
-    DATA numbers TYPE ty_numbers.
-
-    number_segments( EXPORTING segments = top_segments
-                     CHANGING  numbers  = numbers ).
-    check_level( EXPORTING numbers  = numbers
+    check_level( EXPORTING numbers  = segment_numbers( )
                  CHANGING  findings = result ).
   ENDMETHOD.
 
@@ -582,6 +672,14 @@ CLASS zcl_idoctor IMPLEMENTATION.
 
 
   METHOD query_for.
+    " without a segment type every segment matches - and a field exists only within a type
+    IF name IS INITIAL.
+      IF field IS NOT INITIAL.
+        DATA(field_name) = CONV ty_field_name( to_upper( field ) ).
+        RAISE EXCEPTION TYPE zcx_idoctor_error MESSAGE e017(zidoctor) WITH field_name.
+      ENDIF.
+      RETURN.
+    ENDIF.
     result-segment_type = definition_of( name )-segment_type.
     IF field IS NOT INITIAL.
       result-field = field_definition( segment_type = result-segment_type
@@ -844,5 +942,161 @@ CLASS zcl_idoctor IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
-ENDCLASS.
 
+  METHOD control_xml.
+    DATA(control) = flat_control( ).
+    DATA(structure) = CAST cl_abap_structdescr( cl_abap_typedescr=>describe_by_data( control ) ).
+    " the control record is character-like, so each field is a slice of its fixed-length line
+    DATA(line) = fixed_width( control ).
+    DATA(offset) = 0.
+    result = |{ indentation( level ) }<{ control_record_name } SEGMENT="1">{ cl_abap_char_utilities=>newline }|.
+    LOOP AT structure->components INTO DATA(component).
+      DATA(length) = component-length / cl_abap_char_utilities=>charsize.
+      DATA(value) = condense( val = substring( val = line
+                                               off = offset
+                                               len = length )
+                              del = ` ` ).
+      IF value CN ` 0`.
+        result = result && xml_element( name  = component-name
+                                        value = value
+                                        level = level + 1 ).
+      ENDIF.
+      offset = offset + length.
+    ENDLOOP.
+    result = |{ result }{ indentation( level ) }</{ control_record_name }>{ cl_abap_char_utilities=>newline }|.
+  ENDMETHOD.
+
+
+METHOD fields_xml.
+    DATA(fields) = VALUE ty_field_definitions_by_offset(
+                     FOR syntax_field IN syntax-fields WHERE ( segment_type = segment->definition-segment_type )
+                     ( syntax_field ) ).
+    LOOP AT fields INTO DATA(field).
+      DATA(value) = CONV string( segment->sdata+field-offset(field-length) ).
+      IF value IS NOT INITIAL.
+        result = result && xml_element( name  = field-field_name
+                                        value = value
+                                        level = level ).
+      ENDIF.
+    ENDLOOP.
+ENDMETHOD.
+
+
+  METHOD find_by_number.
+    DATA(segment_number) = CONV edidd-segnum( number ).
+    DATA(numbers) = segment_numbers( ).
+    result = VALUE #( numbers[ number = segment_number ]-segment OPTIONAL ).
+    IF result IS NOT BOUND.
+      RAISE EXCEPTION TYPE zcx_idoctor_error MESSAGE e016(zidoctor) WITH segment_number.
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD fixed_width.
+    " the records are character-like structures; moved into one field they keep their layout
+    DATA line TYPE c LENGTH 1100.
+
+    line = record.
+    " the width is the sum of the field lengths, so that trailing blank fields are kept
+    DATA(structure) = CAST cl_abap_structdescr( cl_abap_typedescr=>describe_by_data( record ) ).
+    DATA(width) = 0.
+    LOOP AT structure->components INTO DATA(component).
+      width = width + component-length / cl_abap_char_utilities=>charsize.
+    ENDLOOP.
+    result = |{ line WIDTH = width }|.
+  ENDMETHOD.
+
+
+  METHOD flat_control.
+    result = CORRESPONDING #( control_record ).
+    result-tabnam  = control_record_name.
+    result-idoctyp = control_record-idoctp.
+  ENDMETHOD.
+
+
+  METHOD flat_segment_name.
+    " files carry the segment definition - the version of the segment - where the syntax knows it
+    result = VALUE #( syntax-segments[ segment_type = segment_type ]-definition OPTIONAL ).
+    IF result IS INITIAL.
+      result = segment_type.
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD indentation.
+    result = repeat( val = ` `
+                     occ = level * xml_indentation ).
+  ENDMETHOD.
+
+
+  METHOD number_of.
+    check_attached( segment ).
+    DATA(numbers) = segment_numbers( ).
+    result = numbers[ segment = segment ]-number.
+  ENDMETHOD.
+
+
+  METHOD segments_xml.
+    DATA(newline) = cl_abap_char_utilities=>newline.
+    LOOP AT segments INTO DATA(segment).
+      DATA(name) = xml_name( segment->definition-segment_type ).
+      result = |{ result }{ indentation( level ) }<{ name } SEGMENT="1">{ newline }|
+            && fields_xml( segment = segment
+                           level   = level + 1 )
+            && segments_xml( segments = segment->child_segments
+                             level    = level + 1 )
+            && |{ indentation( level ) }</{ name }>{ newline }|.
+    ENDLOOP.
+  ENDMETHOD.
+
+
+  METHOD segment_numbers.
+    " numbered as append_records( ) numbers the data records: depth first, in document order
+    number_segments( EXPORTING segments = top_segments
+                     CHANGING  numbers  = result ).
+  ENDMETHOD.
+
+
+  METHOD to_flat_file.
+    DATA(separator) = COND string( WHEN line_break IS SUPPLIED THEN line_break
+                                   ELSE cl_abap_char_utilities=>newline ).
+    result = |{ fixed_width( flat_control( ) ) }{ separator }|.
+    DATA(records) = to_edidd( ).
+    LOOP AT records INTO DATA(record).
+      DATA(data_record) = CORRESPONDING edi_dd40( record ).
+      data_record-segnam = flat_segment_name( record-segnam ).
+      result = |{ result }{ fixed_width( data_record ) }{ separator }|.
+    ENDLOOP.
+  ENDMETHOD.
+
+
+  METHOD to_xml.
+    DATA(newline) = cl_abap_char_utilities=>newline.
+    DATA(root) = xml_name( COND string( WHEN control_record-cimtyp IS NOT INITIAL
+                                        THEN control_record-cimtyp
+                                        ELSE control_record-idoctp ) ).
+    result = |<?xml version="1.0"?>{ newline }<{ root }>{ newline }|
+          && |{ indentation( 1 ) }<IDOC BEGIN="1">{ newline }|
+          && control_xml( 2 )
+          && segments_xml( segments = top_segments
+                           level    = 2 )
+          && |{ indentation( 1 ) }</IDOC>{ newline }</{ root }>{ newline }|.
+  ENDMETHOD.
+
+
+  METHOD xml_element.
+    result = |{ indentation( level ) }<{ xml_name( name ) }>|
+          && |{ escape( val    = value
+                        format = cl_abap_format=>e_xml_text ) }|
+          && |</{ xml_name( name ) }>{ cl_abap_char_utilities=>newline }|.
+  ENDMETHOD.
+
+
+  METHOD xml_name.
+    " SAP writes the slash of a namespace as "_-" in XML names, e.g. /ABC/E1HEAD as _-ABC_-E1HEAD
+    result = replace( val  = condense( name )
+                      sub  = `/`
+                      with = `_-`
+                      occ  = 0 ).
+  ENDMETHOD.
+ENDCLASS.

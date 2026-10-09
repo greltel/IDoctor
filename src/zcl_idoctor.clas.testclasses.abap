@@ -75,6 +75,18 @@ CLASS ltc_idoctor DEFINITION FINAL FOR TESTING
     METHODS when_found_by_value_then_hit FOR TESTING RAISING cx_static_check.
     METHODS when_nothing_found_raises FOR TESTING RAISING cx_static_check.
     METHODS given_unknown_field_raises FOR TESTING RAISING cx_static_check.
+    METHODS when_flat_then_fixed_records FOR TESTING RAISING cx_static_check.
+    METHODS when_flat_then_line_per_record FOR TESTING RAISING cx_static_check.
+    METHODS given_definition_flat_uses_it FOR TESTING RAISING cx_static_check.
+    METHODS when_xml_then_children_nested FOR TESTING RAISING cx_static_check.
+    METHODS when_xml_then_control_record FOR TESTING RAISING cx_static_check.
+    METHODS given_empty_field_xml_omits FOR TESTING RAISING cx_static_check.
+    METHODS given_special_chars_xml_escape FOR TESTING RAISING cx_static_check.
+    METHODS when_numbered_then_as_edidd FOR TESTING RAISING cx_static_check.
+    METHODS given_short_number_then_found FOR TESTING RAISING cx_static_check.
+    METHODS given_unknown_number_raises FOR TESTING RAISING cx_static_check.
+    METHODS when_found_without_type_all FOR TESTING RAISING cx_static_check.
+    METHODS given_field_without_type_raise FOR TESTING RAISING cx_static_check.
 
     METHODS valid_idoc
       RETURNING VALUE(result) TYPE REF TO zcl_idoctor
@@ -355,6 +367,188 @@ CLASS ltc_idoctor IMPLEMENTATION.
         cl_abap_unit_assert=>assert_equals( act = error->if_t100_message~t100key-msgno
                                             exp = '006'
                                             msg = `Wrong error - expected: field not defined` ).
+    ENDTRY.
+  ENDMETHOD.
+
+
+  METHOD when_flat_then_fixed_records.
+    DATA(idoc) = valid_idoc( ).
+
+    DATA(file) = idoc->to_flat_file( `` ).
+
+    " EDI_DC40 is 524 characters, EDI_DD40 1063 - one control record and eight data records
+    cl_abap_unit_assert=>assert_equals( act = strlen( file )
+                                        exp = 524 + 8 * 1063
+                                        msg = `Records must be padded to the full length of EDI_DC40 / EDI_DD40` ).
+    cl_abap_unit_assert=>assert_equals( act = substring( val = file
+                                                         len = 8 )
+                                        exp = `EDI_DC40`
+                                        msg = `The file must start with the control record` ).
+    cl_abap_unit_assert=>assert_equals( act = condense( substring( val = file
+                                                                   off = 524
+                                                                   len = 30 ) )
+                                        exp = `Z1HEAD`
+                                        msg = `The first data record must carry the first segment` ).
+  ENDMETHOD.
+
+
+  METHOD when_flat_then_line_per_record.
+    DATA(idoc) = valid_idoc( ).
+
+    DATA(file) = idoc->to_flat_file( ).
+
+    cl_abap_unit_assert=>assert_equals( act = count( val = file
+                                                     sub = cl_abap_char_utilities=>newline )
+                                        exp = 9
+                                        msg = `Every record - control and eight segments - must end in a line break` ).
+  ENDMETHOD.
+
+
+  METHOD given_definition_flat_uses_it.
+    DATA(syntax) = lth_idoc=>syntax( ).
+    DATA(head) = REF #( syntax-segments[ segment_type = 'Z1HEAD' ] ).
+    head->definition = 'Z2HEAD001'.
+    DATA(idoc) = zcl_idoctor=>from_edidd( syntax = syntax
+                                          data   = lth_idoc=>valid_records( ) ).
+
+    DATA(file) = idoc->to_flat_file( `` ).
+
+    cl_abap_unit_assert=>assert_equals( act = condense( substring( val = file
+                                                                   off = 524
+                                                                   len = 30 ) )
+                                        exp = `Z2HEAD001`
+                                        msg = `A file must carry the segment definition where the syntax knows it` ).
+  ENDMETHOD.
+
+
+  METHOD when_xml_then_children_nested.
+    DATA(idoc) = valid_idoc( ).
+
+    DATA(xml) = idoc->to_xml( ).
+
+    DATA(item_start) = find( val = xml
+                             sub = `<Z1ITEM SEGMENT="1">` ).
+    DATA(text) = find( val = xml
+                       sub = `<TDLINE>Handle with care</TDLINE>` ).
+    DATA(item_end) = find( val = xml
+                           sub = `</Z1ITEM>` ).
+    cl_abap_unit_assert=>assert_true( act = xsdbool( item_start >= 0 AND item_start < text AND text < item_end )
+                                      msg = `The item text must be nested in the first item element` ).
+    cl_abap_unit_assert=>assert_equals( act = find( val = xml
+                                                    sub = `<ZTEST_ORDERS>` )
+                                        exp = find( val = xml
+                                                    sub = `<ZTEST_ORDERS` )
+                                        msg = `The root element must be named after the IDoc type` ).
+  ENDMETHOD.
+
+
+  METHOD when_xml_then_control_record.
+    DATA(idoc) = zcl_idoctor=>from_edidd( syntax  = lth_idoc=>syntax( )
+                                          data    = lth_idoc=>valid_records( )
+                                          control = VALUE #( docnum = '0000000000004711' ) ).
+
+    DATA(xml) = idoc->to_xml( ).
+
+    cl_abap_unit_assert=>assert_true( act = xsdbool( xml CS `<DOCNUM>0000000000004711</DOCNUM>`
+                                                 AND xml CS `<IDOCTYP>ZTEST_ORDERS</IDOCTYP>`
+                                                 AND xml CS `<TABNAM>EDI_DC40</TABNAM>` )
+                                      msg = `The control record must appear as EDI_DC40 with its fields` ).
+  ENDMETHOD.
+
+
+  METHOD given_empty_field_xml_omits.
+    DATA(idoc) = zcl_idoctor=>create( lth_idoc=>syntax( ) ).
+    idoc->add( 'Z1HEAD' )->set_value( field = 'DOCNO'
+                                      value = 'PO-1' ).
+
+    DATA(xml) = idoc->to_xml( ).
+
+    cl_abap_unit_assert=>assert_true( act = xsdbool( xml CS `<DOCNO>PO-1</DOCNO>` AND xml NS `<CURCY>` )
+                                      msg = `Filled fields must be written, empty ones left out` ).
+  ENDMETHOD.
+
+
+  METHOD given_special_chars_xml_escape.
+    DATA(idoc) = zcl_idoctor=>create( lth_idoc=>syntax( ) ).
+    idoc->add( 'Z1HEAD' )->set_value( field = 'DOCNO'
+                                      value = 'A&B<C' ).
+
+    DATA(xml) = idoc->to_xml( ).
+
+    cl_abap_unit_assert=>assert_true( act = xsdbool( xml CS `<DOCNO>A&amp;B&lt;C</DOCNO>` )
+                                      msg = `Characters with a meaning in XML must be escaped` ).
+  ENDMETHOD.
+
+
+  METHOD when_numbered_then_as_edidd.
+    DATA(idoc) = valid_idoc( ).
+
+    DATA(records) = idoc->to_edidd( ).
+
+    LOOP AT records INTO DATA(record).
+      DATA(segment) = idoc->find_by_number( record-segnum ).
+      cl_abap_unit_assert=>assert_equals( act = segment->name( )
+                                          exp = record-segnam
+                                          msg = |Segment { record-segnum } must be the one to_edidd( ) numbers so| ).
+      cl_abap_unit_assert=>assert_equals( act = segment->number( )
+                                          exp = record-segnum
+                                          msg = |number( ) must give { record-segnum } back| ).
+    ENDLOOP.
+  ENDMETHOD.
+
+
+  METHOD given_short_number_then_found.
+    DATA(idoc) = valid_idoc( ).
+
+    DATA(item) = idoc->find_by_number( `6` ).
+
+    cl_abap_unit_assert=>assert_equals( act = item->get_value( 'POSNR' )
+                                        exp = `000020`
+                                        msg = `Number 6 without leading zeros must find the second item` ).
+  ENDMETHOD.
+
+
+  METHOD given_unknown_number_raises.
+    DATA(idoc) = valid_idoc( ).
+
+    TRY.
+        idoc->find_by_number( '000099' ).
+        cl_abap_unit_assert=>fail( msg = `A number beyond the last segment must raise` ).
+      CATCH zcx_idoctor_error INTO DATA(error).
+        cl_abap_unit_assert=>assert_equals( act = error->if_t100_message~t100key-msgno
+                                            exp = '016'
+                                            msg = `Wrong error - expected: no segment with that number` ).
+    ENDTRY.
+  ENDMETHOD.
+
+
+  METHOD when_found_without_type_all.
+    DATA(idoc) = valid_idoc( ).
+    DATA(records) = idoc->to_edidd( ).
+    DATA(expected) = VALUE string_table( FOR record IN records ( |{ record-segnam }| ) ).
+
+    DATA(all) = idoc->find_all( ).
+
+    cl_abap_unit_assert=>assert_equals( act = names_of( all )
+                                        exp = expected
+                                        msg = `find_all( ) without a type must list every segment in document order` ).
+    cl_abap_unit_assert=>assert_equals( act = lines( idoc->find_all( 'Z1ITEM' ) )
+                                        exp = 2
+                                        msg = `A type passed without parameter name must still filter by type` ).
+  ENDMETHOD.
+
+
+  METHOD given_field_without_type_raise.
+    DATA(idoc) = valid_idoc( ).
+
+    TRY.
+        idoc->find_all( field = 'MATNR'
+                        value = 'MAT-A' ).
+        cl_abap_unit_assert=>fail( msg = `A field without a segment type must be rejected` ).
+      CATCH zcx_idoctor_error INTO DATA(error).
+        cl_abap_unit_assert=>assert_equals( act = error->if_t100_message~t100key-msgno
+                                            exp = '017'
+                                            msg = `Wrong error - expected: field needs a segment type` ).
     ENDTRY.
   ENDMETHOD.
 
