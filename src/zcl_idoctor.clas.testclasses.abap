@@ -87,6 +87,10 @@ CLASS ltc_idoctor DEFINITION FINAL FOR TESTING
     METHODS given_unknown_number_raises FOR TESTING RAISING cx_static_check.
     METHODS when_found_without_type_all FOR TESTING RAISING cx_static_check.
     METHODS given_field_without_type_raise FOR TESTING RAISING cx_static_check.
+    METHODS when_inserted_then_renumbered FOR TESTING RAISING cx_static_check.
+    METHODS when_removed_then_subtree_gone FOR TESTING RAISING cx_static_check.
+    METHODS given_no_schedule_then_finding FOR TESTING RAISING cx_static_check.
+    METHODS given_namespace_xml_names FOR TESTING RAISING cx_static_check.
 
     METHODS valid_idoc
       RETURNING VALUE(result) TYPE REF TO zcl_idoctor
@@ -94,6 +98,11 @@ CLASS ltc_idoctor DEFINITION FINAL FOR TESTING
 
     METHODS names_of
       IMPORTING segments      TYPE zcl_idoctor=>ty_segments
+      RETURNING VALUE(result) TYPE string_table.
+
+    "! One line per record: SEGNUM, PSGNUM and segment type
+    METHODS numbering_of
+      IMPORTING records       TYPE zcl_idoctor=>ty_data_records
       RETURNING VALUE(result) TYPE string_table.
 ENDCLASS.
 
@@ -553,6 +562,96 @@ CLASS ltc_idoctor IMPLEMENTATION.
   ENDMETHOD.
 
 
+  METHOD when_inserted_then_renumbered.
+    " the user exit case: a partner goes in front of the items, which move with their children
+    DATA(idoc) = valid_idoc( ).
+    DATA(ship_to) = idoc->find_first( 'Z1PARTNER' )->insert_after( 'Z1PARTNER' ).
+
+    DATA(records) = idoc->to_edidd( ).
+
+    cl_abap_unit_assert=>assert_equals( act = numbering_of( records )
+                                        exp = VALUE string_table( ( `000001 000000 Z1HEAD` )
+                                                                  ( `000002 000000 Z1PARTNER` )
+                                                                  ( `000003 000000 Z1PARTNER` )
+                                                                  ( `000004 000000 Z1ITEM` )
+                                                                  ( `000005 000004 Z1ITEMTEXT` )
+                                                                  ( `000006 000004 Z1SCHEDULE` )
+                                                                  ( `000007 000000 Z1ITEM` )
+                                                                  ( `000008 000007 Z1SCHEDULE` )
+                                                                  ( `000009 000000 Z1TOTAL` ) )
+                                        msg = `SEGNUM after the new partner and PSGNUM of moved parents must move up` ).
+    cl_abap_unit_assert=>assert_equals( act = ship_to->number( )
+                                        exp = '000003'
+                                        msg = `The new partner must directly follow the existing one` ).
+  ENDMETHOD.
+
+
+  METHOD when_removed_then_subtree_gone.
+    DATA(idoc) = valid_idoc( ).
+
+    idoc->find_first( 'Z1ITEM' )->remove( ).
+
+    cl_abap_unit_assert=>assert_equals( act = numbering_of( idoc->to_edidd( ) )
+                                        exp = VALUE string_table( ( `000001 000000 Z1HEAD` )
+                                                                  ( `000002 000000 Z1PARTNER` )
+                                                                  ( `000003 000000 Z1ITEM` )
+                                                                  ( `000004 000003 Z1SCHEDULE` )
+                                                                  ( `000005 000000 Z1TOTAL` ) )
+                                        msg = `The first item must leave with its text and schedule line` ).
+    cl_abap_unit_assert=>assert_equals( act = idoc->find_by_number( '000003' )->get_value( 'MATNR' )
+                                        exp = `MAT-B`
+                                        msg = `The second item must be left` ).
+  ENDMETHOD.
+
+
+  METHOD given_no_schedule_then_finding.
+    DATA(records) = lth_idoc=>valid_records( ).
+    " the schedule line of the second item - Z1SCHEDULE is mandatory under every item
+    DELETE records WHERE segnam = 'Z1SCHEDULE' AND sdata = '20270115'.
+    DATA(idoc) = zcl_idoctor=>from_edidd( syntax = lth_idoc=>syntax( )
+                                          data   = records ).
+
+    DATA(findings) = idoc->validate( ).
+
+    cl_abap_unit_assert=>assert_equals( act = lines( findings )
+                                        exp = 1
+                                        msg = `The missing schedule line must be the one finding` ).
+    cl_abap_unit_assert=>assert_equals( act = findings[ 1 ]-msgno
+                                        exp = '020'
+                                        msg = `Wrong finding - expected: at least 1 required` ).
+    cl_abap_unit_assert=>assert_equals( act = findings[ 1 ]-segment->get_value( 'POSNR' )
+                                        exp = `000020`
+                                        msg = `The finding must point to the item that lacks the schedule line` ).
+    cl_abap_unit_assert=>assert_equals( act = CONV string( findings[ 1 ]-msgv3 )
+                                        exp = `Z1ITEM 000006`
+                                        msg = `The text must name the item with its segment number` ).
+  ENDMETHOD.
+
+
+  METHOD given_namespace_xml_names.
+    DATA(syntax) = VALUE zcl_idoctor=>ty_syntax(
+      idoc_type = 'ZTEST_ORDERS'
+      extension = '/ABC/ZTEST_EXT'
+      segments  = VALUE #( ( segment_type    = '/ABC/Z1HEAD'
+                             position        = 1
+                             hierarchy_level = '02'
+                             min_occurrence  = 1
+                             max_occurrence  = 1 ) )
+      fields    = VALUE #( ( segment_type = '/ABC/Z1HEAD' field_name = 'DOCNO' offset = 0 length = 10 ) ) ).
+    DATA(idoc) = zcl_idoctor=>create( syntax ).
+    idoc->add( '/ABC/Z1HEAD' )->set_value( field = 'DOCNO'
+                                           value = 'PO-1' ).
+
+    DATA(xml) = idoc->to_xml( ).
+
+    cl_abap_unit_assert=>assert_true( act = xsdbool( xml CS `<_-ABC_-ZTEST_EXT>` AND xml NS `<ZTEST_ORDERS>` )
+                                      msg = `With an extension the root must be named after it, slash as _-` ).
+    cl_abap_unit_assert=>assert_true( act = xsdbool( xml CS `<_-ABC_-Z1HEAD SEGMENT="1">`
+                                                 AND xml CS `</_-ABC_-Z1HEAD>` )
+                                      msg = `A namespace segment must be written with _- for each slash` ).
+  ENDMETHOD.
+
+
   METHOD valid_idoc.
     result = zcl_idoctor=>from_edidd( syntax = lth_idoc=>syntax( )
                                       data   = lth_idoc=>valid_records( ) ).
@@ -561,6 +660,11 @@ CLASS ltc_idoctor IMPLEMENTATION.
 
   METHOD names_of.
     result = VALUE #( FOR segment IN segments ( |{ segment->name( ) }| ) ).
+  ENDMETHOD.
+
+
+  METHOD numbering_of.
+    result = VALUE #( FOR record IN records ( |{ record-segnum } { record-psgnum } { record-segnam }| ) ).
   ENDMETHOD.
 
 ENDCLASS.

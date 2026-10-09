@@ -967,7 +967,7 @@ CLASS ZCL_IDOCTOR IMPLEMENTATION.
   ENDMETHOD.
 
 
-METHOD fields_xml.
+  METHOD fields_xml.
     DATA(fields) = VALUE ty_field_definitions_by_offset(
                      FOR syntax_field IN syntax-fields WHERE ( segment_type = segment->definition-segment_type )
                      ( syntax_field ) ).
@@ -979,7 +979,7 @@ METHOD fields_xml.
                                         level = level ).
       ENDIF.
     ENDLOOP.
-ENDMETHOD.
+  ENDMETHOD.
 
 
   METHOD find_by_number.
