@@ -1,5 +1,8 @@
 # IDoctor
 
+[![abaplint](https://github.com/greltel/IDoctor/actions/workflows/abaplint.yml/badge.svg)](https://github.com/greltel/IDoctor/actions/workflows/abaplint.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 IDoctor turns an SAP IDoc into an object tree. You can create an IDoc, load it from the
 database, find and change its segments with typed or field-level access, check it against
 the syntax of its IDoc type, and save it back.
@@ -48,10 +51,15 @@ COMMIT WORK.
   records. The parent of each segment comes from the IDoc type, so SEGNUM, PSGNUM and HLEVEL
   in the input don't need to be filled.
 - Produce EDIDD records again, numbered afresh.
-- Navigate the tree: top-level segments, children, parent, and deep search by segment type
-  and field value.
+- Write the IDoc as a flat file (`EDI_DC40` / `EDI_DD40` records, as a file port writes
+  them) or as IDoc-XML, as one string, e.g. to download it, log it or send it elsewhere.
+- Navigate the tree: top-level segments, children, parent, deep search by segment type and
+  field value, and every segment in document order.
+- Find a segment by its number, e.g. the segment number (SEGNUM) a status record names for
+  an application error, and get the number of any segment.
 - Read and write segment data field by field (`get_value` / `set_value`) or as a whole
   structure (`get_data` / `set_data` with the DDIC structure of the segment, e.g. `E1EDP01`).
+  The setters return the segment, so calls can be chained.
 - Add, insert and remove segments. Every structural change is checked against the IDoc
   type: the parent must be right, the order of siblings is kept, and a segment can't occur
   more often than the IDoc type allows.
@@ -88,6 +96,13 @@ that subpackage if you don't want the demos in your system.
 | `ZCX_IDOCTOR_ERROR` | Exception class | `Z_IDOCTOR` | The one exception of IDoctor |
 | `ZIDOCTOR` | Message class | `Z_IDOCTOR` | All texts |
 | `ZIDOCTOR_DEMO_01` … `_04` | Programs | `Z_IDOCTOR_DEMOS` | Runnable examples |
+
+| Demo | Shows |
+|---|---|
+| `ZIDOCTOR_DEMO_01` | Build an ORDERS05 IDoc in memory, validate it and list its EDIDD records. Reads and writes no IDoc tables. |
+| `ZIDOCTOR_DEMO_02` | Load one IDoc, change a field in the matching segments and save it. Test mode saves nothing. |
+| `ZIDOCTOR_DEMO_03` | Fix IDocs in error status in bulk: one LUW per IDoc, test mode and a result list. |
+| `ZIDOCTOR_DEMO_04` | The user exit pattern: add a ship-to partner to the EDIDD records of an ORDERS IDoc and show them before and after. Saves nothing. |
 
 ## Usage
 
@@ -153,6 +168,11 @@ DATA header TYPE e1edk01.
 header-curcy = 'EUR'.
 idoc->add( 'E1EDK01' )->set_data( header ).
 
+idoc->add( 'E1EDKA1' )->set_value( field = 'PARVW'
+                                   value = 'AG'
+  )->set_value( field = 'PARTN'
+                value = '0000004711' ).
+
 DATA(item) = idoc->add( 'E1EDP01' ).
 item->set_value( field = 'MENGE'
                  value = '5' ).
@@ -164,6 +184,50 @@ DATA(records) = idoc->to_edidd( ).
 ```
 
 `add( )` puts a segment where the IDoc type puts it, whatever order you add segments in.
+`set_value( )` and `set_data( )` return the segment, so several fields can be set in one
+chain.
+
+### Go to the segment a status record names
+
+When an application rejects an inbound IDoc (status 51), it often names the faulty segment
+in the status record (`EDIDS-SEGNUM`). SAP numbers the segments of an IDoc from 000001 in
+document order, so `find_by_number( )` leads straight to it:
+
+```abap
+" status: the EDIDS record of the error, as your program reads it
+DATA(idoc) = repository->load( status-docnum ).
+DATA(faulty) = idoc->find_by_number( status-segnum ).
+faulty->set_value( field = 'IDTNR'
+                   value = 'NEW-MATERIAL' ).
+repository->save( idoc     = idoc
+                  settings = VALUE #( commit = abap_true ) ).
+```
+
+The number is the position `to_edidd( )` gives a segment now: `segment->number( )` returns
+it, and it moves when segments are added or removed in front of the segment. `find_all( )`
+without a segment type returns every segment of the IDoc, or of a segment's subtree, in
+document order.
+
+### Get the IDoc as one string
+
+```abap
+DATA(file) = idoc->to_flat_file( ).                            " records separated by LF
+DATA(windows_file) = idoc->to_flat_file( cl_abap_char_utilities=>cr_lf ).
+DATA(xml) = idoc->to_xml( ).
+```
+
+`to_flat_file( )` writes the control record as `EDI_DC40` and one `EDI_DD40` record per
+segment, each padded to its full length (524 and 1063 characters). Data records carry the
+segment definition (e.g. `E2EDK01005`) where the IDoc type knows it, otherwise the segment
+type. Pass an empty string as line break for one continuous block of fixed-length records.
+
+`to_xml( )` writes IDoc-XML: a root element named after the extension (the basic type when
+there is none), one `IDOC` element with the control record as `EDI_DC40` and one element
+per segment, children nested in their parent. Empty fields are left out, special characters
+are escaped, and a namespace slash becomes `_-` (`/ABC/E1HEAD` → `_-ABC_-E1HEAD`).
+
+Both are built in memory from the tree, numbered as `to_edidd( )` numbers them. Neither
+writes a file nor sends anything.
 
 ### API at a glance
 
@@ -172,17 +236,21 @@ DATA(records) = idoc->to_edidd( ).
 | `create( syntax )` | Empty IDoc |
 | `from_edidd( syntax data [control] )` | IDoc from data records |
 | `to_edidd( )` | Data records, numbered afresh |
+| `to_flat_file( [line_break] )` | Flat file as one string |
+| `to_xml( )` | IDoc-XML as one string |
 | `control( )` | Control record |
 | `segments( [name] )` | Top-level segments |
-| `find_first( name [field value] )` / `find_all( … )` | Deep search |
+| `find_first( name [field value] )` / `find_all( [name field value] )` | Deep search; `find_all( )` without type returns every segment |
+| `find_by_number( number )` | Segment by its number (SEGNUM) |
 | `add( name )` | New top-level segment |
 | `validate( )` | Findings against the syntax |
 
 | `ZCL_IDOCTOR_SEGMENT` | |
 |---|---|
 | `name( )`, `parent( )`, `children( [name] )`, `idoc( )` | Navigation |
-| `get_value( field )` / `set_value( field value )` | Field access |
-| `get_data( IMPORTING data )` / `set_data( data )` | Typed access |
+| `number( )` | Segment number, as `to_edidd( )` gives it now |
+| `get_value( field )` / `set_value( field value )` | Field access; `set_value( )` returns the segment |
+| `get_data( IMPORTING data )` / `set_data( data )` | Typed access; `set_data( )` returns the segment |
 | `find_first( … )` / `find_all( … )` | Search below this segment |
 | `add( name )` | New child segment |
 | `insert_before( name )` / `insert_after( name )` | New sibling |
@@ -227,13 +295,17 @@ classDiagram
     +create(syntax)$
     +from_edidd(syntax, data, control)$
     +to_edidd()
+    +to_flat_file(line_break)
+    +to_xml()
     +segments(name)
     +find_first(name, field, value)
+    +find_by_number(number)
     +add(name)
     +validate()
   }
   class ZCL_IDOCTOR_SEGMENT {
     <<tree node>>
+    +number()
     +get_value(field)
     +set_value(field, value)
     +get_data(data)
@@ -362,8 +434,8 @@ Issues and pull requests are welcome.
 - New code follows [Clean ABAP](https://github.com/SAP/styleguides/blob/main/clean-abap/CleanABAP.md),
   documents every public declaration with ABAP Doc, and comes with ABAP Unit tests.
 - The code must activate on ABAP 7.50. [abaplint](https://abaplint.org) checks this on every
-  push and pull request (`abaplint.json`, syntax version `v750`). To run it locally:
-  `npx @abaplint/cli .abaplint.json`.
+  push and pull request (`abaplint.json`, syntax version `v750`). To run it locally with the
+  same version as the pipeline: `npx @abaplint/cli@2.120.70 abaplint.json`.
 
 ## Credits
 
