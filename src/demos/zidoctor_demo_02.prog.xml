@@ -11,6 +11,18 @@
    </PROGDIR>
    <TPOOL>
     <item>
+     <ID>I</ID>
+     <KEY>001</KEY>
+     <ENTRY>Old value</ENTRY>
+     <LENGTH>19</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>002</KEY>
+     <ENTRY>New Value</ENTRY>
+     <LENGTH>19</LENGTH>
+    </item>
+    <item>
      <ID>R</ID>
      <ENTRY>IDoctor demo 02: change and save one IDoc</ENTRY>
      <LENGTH>41</LENGTH>

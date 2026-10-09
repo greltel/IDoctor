@@ -93,6 +93,7 @@ CLASS lcl_demo DEFINITION FINAL.
         sdata   TYPE edidd-sdata,
       END OF ty_row.
     TYPES ty_rows TYPE STANDARD TABLE OF ty_row WITH EMPTY KEY.
+    CONSTANTS version_column TYPE lvc_fname VALUE 'VERSION'.
 
     DATA repository TYPE REF TO zif_idoctor_repository.
 
@@ -104,6 +105,12 @@ CLASS lcl_demo DEFINITION FINAL.
       IMPORTING version       TYPE string
                 records       TYPE zcl_idoctor=>ty_data_records
       RETURNING VALUE(result) TYPE ty_rows.
+
+    METHODS set_title
+      IMPORTING columns TYPE REF TO cl_salv_columns_table
+                name    TYPE lvc_fname
+                title   TYPE csequence
+      RAISING   cx_salv_not_found.
 ENDCLASS.
 
 
@@ -137,11 +144,24 @@ CLASS lcl_demo IMPLEMENTATION.
     TRY.
         cl_salv_table=>factory( IMPORTING r_salv_table = DATA(alv)
                                 CHANGING  t_table      = rows ).
-        alv->get_columns( )->set_optimize( ).
+        DATA(columns) = alv->get_columns( ).
+        columns->set_optimize( ).
+        set_title( columns = columns
+                   name    = version_column
+                   title   = TEXT-001 ).
         alv->display( ).
-      CATCH cx_salv_msg INTO DATA(error).
+      CATCH cx_salv_msg cx_salv_not_found INTO DATA(error).
         MESSAGE error TYPE 'S' DISPLAY LIKE 'E'.
     ENDTRY.
+  ENDMETHOD.
+
+
+  METHOD set_title.
+    " a column typed without a DDIC data element has no heading of its own
+    DATA(salv_column) = columns->get_column( name ).
+    salv_column->set_short_text( CONV #( title ) ).
+    salv_column->set_medium_text( CONV #( title ) ).
+    salv_column->set_long_text( CONV #( title ) ).
   ENDMETHOD.
 
 

@@ -11,6 +11,12 @@
    </PROGDIR>
    <TPOOL>
     <item>
+     <ID>I</ID>
+     <KEY>001</KEY>
+     <ENTRY>Version</ENTRY>
+     <LENGTH>17</LENGTH>
+    </item>
+    <item>
      <ID>R</ID>
      <ENTRY>IDoctor demo 04: change EDIDD in a user exit</ENTRY>
      <LENGTH>44</LENGTH>

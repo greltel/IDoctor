@@ -153,6 +153,61 @@ CLASS lcl_bulk_fix IMPLEMENTATION.
 ENDCLASS.
 
 
+"! Shows the result of the bulk fix, one line per IDoc
+CLASS lcl_result_list DEFINITION FINAL.
+  PUBLIC SECTION.
+    "! @parameter results | Result per IDoc
+    METHODS show
+      IMPORTING results TYPE lcl_bulk_fix=>ty_results.
+
+  PRIVATE SECTION.
+    CONSTANTS:
+      BEGIN OF column,
+        changed TYPE lvc_fname VALUE 'CHANGED',
+        message TYPE lvc_fname VALUE 'MESSAGE',
+      END OF column.
+
+    METHODS set_title
+      IMPORTING columns TYPE REF TO cl_salv_columns_table
+                name    TYPE lvc_fname
+                title   TYPE csequence
+      RAISING   cx_salv_not_found.
+ENDCLASS.
+
+
+CLASS lcl_result_list IMPLEMENTATION.
+
+  METHOD show.
+    DATA(rows) = results.
+    TRY.
+        cl_salv_table=>factory( IMPORTING r_salv_table = DATA(alv)
+                                CHANGING  t_table      = rows ).
+        DATA(columns) = alv->get_columns( ).
+        columns->set_optimize( ).
+        set_title( columns = columns
+                   name    = column-changed
+                   title   = TEXT-001 ).
+        set_title( columns = columns
+                   name    = column-message
+                   title   = TEXT-002 ).
+        alv->display( ).
+      CATCH cx_salv_msg cx_salv_not_found INTO DATA(error).
+        MESSAGE error TYPE 'S' DISPLAY LIKE 'E'.
+    ENDTRY.
+  ENDMETHOD.
+
+
+  METHOD set_title.
+    " a column typed without a DDIC data element has no heading of its own
+    DATA(salv_column) = columns->get_column( name ).
+    salv_column->set_short_text( CONV #( title ) ).
+    salv_column->set_medium_text( CONV #( title ) ).
+    salv_column->set_long_text( CONV #( title ) ).
+  ENDMETHOD.
+
+ENDCLASS.
+
+
 INITIALIZATION.
   p_status = status_application_error.
 
@@ -170,11 +225,4 @@ START-OF-SELECTION.
   DATA(bulk_fix) = NEW lcl_bulk_fix( NEW zcl_idoctor_repository( ) ).
   DATA(results) = bulk_fix->run( docnums = docnums
                                  fix     = fix ).
-  TRY.
-      cl_salv_table=>factory( IMPORTING r_salv_table = DATA(alv)
-                              CHANGING  t_table      = results ).
-      alv->get_columns( )->set_optimize( ).
-      alv->display( ).
-    CATCH cx_salv_msg INTO DATA(error).
-      MESSAGE error TYPE 'S' DISPLAY LIKE 'E'.
-  ENDTRY.
+  NEW lcl_result_list( )->show( results ).
