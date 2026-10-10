@@ -1,0 +1,26 @@
+{
+  "name": "idoctor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "IDoctor: runs the ABAP Unit tests off-stack with the abaplint transpiler and open-abap-core.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/greltel/IDoctor.git"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "transpile": "rimraf output && abap_transpile abap_transpile.json",
+    "unit": "node transpiler/run_unit_tests.mjs",
+    "unit:verbose": "node transpiler/run_unit_tests.mjs --verbose",
+    "test": "npm run transpile && npm run unit"
+  },
+  "devDependencies": {
+    "@abaplint/runtime": "^2.14.3",
+    "@abaplint/transpiler-cli": "^2.14.3",
+    "open-abap-core": "github:open-abap/open-abap-core#88e7958394cc9f76151491959b961a546fc0cdea",
+    "rimraf": "^6.0.1"
+  }
+}
