@@ -1,6 +1,7 @@
 # IDoctor
 
 [![abaplint](https://github.com/greltel/IDoctor/actions/workflows/abaplint.yml/badge.svg)](https://github.com/greltel/IDoctor/actions/workflows/abaplint.yml)
+[![unit tests](https://github.com/greltel/IDoctor/actions/workflows/unit.yml/badge.svg)](https://github.com/greltel/IDoctor/actions/workflows/unit.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 IDoctor turns an SAP IDoc into an object tree. You can create an IDoc, load it from the
@@ -414,6 +415,26 @@ Run the tests in ADT with *Run As → ABAP Unit Test* on package `Z_IDOCTOR`.
 
 All test classes are `RISK LEVEL HARMLESS` and `DURATION SHORT`.
 
+### Off-stack
+
+The workflow `unit tests` runs the tests on every push and pull request without an SAP
+system: the [abaplint transpiler](https://github.com/abaplint/transpiler) turns the classes
+into JavaScript, and [open-abap-core](https://github.com/open-abap/open-abap-core) provides
+the SAP standard classes they use. Locally: `npm ci`, then `npm test`.
+
+- `transpiler/ddic/` holds the DDIC types IDoctor uses (`EDIDC`, `EDIDD`, `EDI_IAPI11`, the
+  ORDERS05 segments and others), exported from an S/4HANA 2023 system: every field with its
+  predefined type, the tables `EDIDC` and `EDIDS` as structures. open-abap-core does not
+  contain them. The folder is outside `src/`, so abapGit ignores it.
+- `transpiler/run_unit_tests.mjs` runs the tests and prints the ABAP message of every
+  failure.
+- `abap_transpile.json` leaves out the demo reports and, for now, these tests:
+
+| Test | Reason |
+|---|---|
+| `ZCL_IDOCTOR`: `given_special_chars_xml_escape` | `escape( )` with `cl_abap_format=>e_xml_text` is not in the transpiler runtime yet |
+| The tests of `ZCL_IDOCTOR_REPOSITORY` | They need configurations and `verify( )` of the function module test doubles, which open-abap-core does not have yet |
+
 ## Messages
 
 Message class `ZIDOCTOR`:
@@ -436,6 +457,8 @@ Issues and pull requests are welcome.
 - The code must activate on ABAP 7.50. [abaplint](https://abaplint.org) checks this on every
   push and pull request (`abaplint.json`, syntax version `v750`). To run it locally with the
   same version as the pipeline: `npx @abaplint/cli@2.120.70 abaplint.json`.
+- The unit tests also run off-stack (see [Tests](#tests)). A DDIC type the code starts to use
+  needs a stand-in in `transpiler/ddic/`.
 
 ## Credits
 
