@@ -236,6 +236,15 @@ CLASS zcl_idoctor DEFINITION
         number  TYPE edidd-segnum,
       END OF ty_number.
     TYPES ty_numbers TYPE HASHED TABLE OF ty_number WITH UNIQUE KEY segment.
+    TYPES:
+      BEGIN OF ty_numbering,
+        " number of every attached segment
+        numbers  TYPE ty_numbers,
+        " attached segments in document order - the index is the segment number
+        ordered  TYPE ty_segments,
+        " cleared by every structural change
+        is_valid TYPE abap_bool,
+      END OF ty_numbering.
     TYPES ty_field_definitions_by_offset TYPE SORTED TABLE OF ty_field_definition
       WITH NON-UNIQUE KEY offset.
 
@@ -249,6 +258,8 @@ CLASS zcl_idoctor DEFINITION
     DATA syntax TYPE ty_syntax.
     DATA control_record TYPE edidc.
     DATA top_segments TYPE ty_segments.
+    " computed on demand and kept until the structure changes
+    DATA numbering TYPE ty_numbering.
 
     CLASS-METHODS check_syntax
       IMPORTING syntax TYPE ty_syntax
@@ -286,6 +297,11 @@ CLASS zcl_idoctor DEFINITION
                 target_index  TYPE i
                 definition    TYPE ty_segment_definition
       RETURNING VALUE(result) TYPE abap_bool.
+
+    CLASS-METHODS position_for
+      IMPORTING siblings      TYPE ty_segments
+                definition    TYPE ty_segment_definition
+      RETURNING VALUE(result) TYPE i.
 
     METHODS build
       IMPORTING data TYPE STANDARD TABLE
@@ -387,7 +403,12 @@ CLASS zcl_idoctor DEFINITION
 
     CLASS-METHODS fixed_width
       IMPORTING record        TYPE any
+                width         TYPE i
       RETURNING VALUE(result) TYPE string.
+
+    CLASS-METHODS width_of
+      IMPORTING record        TYPE any
+      RETURNING VALUE(result) TYPE i.
 
     CLASS-METHODS xml_name
       IMPORTING name          TYPE csequence
@@ -411,30 +432,28 @@ CLASS zcl_idoctor DEFINITION
       RETURNING VALUE(result) TYPE edi_dd40-segnam.
 
     METHODS control_xml
-      IMPORTING level         TYPE i
-      RETURNING VALUE(result) TYPE string.
+      IMPORTING level     TYPE i
+      CHANGING  xml_lines TYPE string_table.
 
     METHODS segments_xml
-      IMPORTING segments      TYPE ty_segments
-                level         TYPE i
-      RETURNING VALUE(result) TYPE string.
+      IMPORTING segments  TYPE ty_segments
+                level     TYPE i
+      CHANGING  xml_lines TYPE string_table.
 
     METHODS fields_xml
-      IMPORTING segment       TYPE REF TO zcl_idoctor_segment
-                level         TYPE i
-      RETURNING VALUE(result) TYPE string.
+      IMPORTING segment   TYPE REF TO zcl_idoctor_segment
+                level     TYPE i
+      CHANGING  xml_lines TYPE string_table.
 
     METHODS append_records
       IMPORTING segments      TYPE ty_segments
                 parent_number TYPE edidd-psgnum OPTIONAL
       CHANGING  records       TYPE ty_data_records.
 
-    METHODS segment_numbers
-      RETURNING VALUE(result) TYPE ty_numbers.
+    METHODS refresh_numbering.
 
     METHODS number_segments
-      IMPORTING segments TYPE ty_segments
-      CHANGING  numbers  TYPE ty_numbers.
+      IMPORTING segments TYPE ty_segments.
 
     METHODS check_level
       IMPORTING parent   TYPE REF TO zcl_idoctor_segment OPTIONAL
@@ -522,7 +541,8 @@ CLASS ZCL_IDOCTOR IMPLEMENTATION.
 
 
   METHOD validate.
-    check_level( EXPORTING numbers  = segment_numbers( )
+    refresh_numbering( ).
+    check_level( EXPORTING numbers  = numbering-numbers
                  CHANGING  findings = result ).
   ENDMETHOD.
 
@@ -639,6 +659,7 @@ CLASS ZCL_IDOCTOR IMPLEMENTATION.
       INSERT segment INTO TABLE siblings->*.
       INSERT segment INTO TABLE path.
     ENDLOOP.
+    CLEAR numbering-is_valid.
   ENDMETHOD.
 
 
@@ -721,17 +742,12 @@ CLASS ZCL_IDOCTOR IMPLEMENTATION.
     check_room( parent     = parent
                 definition = definition ).
     DATA(siblings) = children_of( parent ).
-    " behind the siblings the syntax puts before or with it, in front of those it puts behind it
-    DATA(target_index) = lines( siblings->* ) + 1.
-    LOOP AT siblings->* INTO DATA(sibling).
-      IF sibling->definition-position > definition-position.
-        target_index = sy-tabix.
-        EXIT.
-      ENDIF.
-    ENDLOOP.
+    DATA(target_index) = position_for( siblings   = siblings->*
+                                       definition = definition ).
     result = new_segment( definition = definition
                           parent     = parent ).
     INSERT result INTO siblings->* INDEX target_index.
+    CLEAR numbering-is_valid.
   ENDMETHOD.
 
 
@@ -756,6 +772,7 @@ CLASS ZCL_IDOCTOR IMPLEMENTATION.
     result = new_segment( definition = definition
                           parent     = anchor->parent_segment ).
     INSERT result INTO siblings->* INDEX target_index.
+    CLEAR numbering-is_valid.
   ENDMETHOD.
 
 
@@ -764,6 +781,8 @@ CLASS ZCL_IDOCTOR IMPLEMENTATION.
     DATA(siblings) = children_of( segment->parent_segment ).
     DELETE siblings->* WHERE table_line = segment.
     CLEAR segment->parent_segment.
+    segment->is_removed = abap_true.
+    CLEAR numbering-is_valid.
   ENDMETHOD.
 
 
@@ -782,6 +801,10 @@ CLASS ZCL_IDOCTOR IMPLEMENTATION.
 
   METHOD check_room.
     DATA(siblings) = children_of( parent ).
+    " fewer siblings than allowed occurrences leave room whatever their types are
+    IF lines( siblings->* ) < definition-max_occurrence.
+      RETURN.
+    ENDIF.
     DATA(occurrences) = lines( of_type( segments = siblings->*
                                         name     = definition-segment_type ) ).
     IF occurrences >= definition-max_occurrence.
@@ -802,14 +825,15 @@ CLASS ZCL_IDOCTOR IMPLEMENTATION.
 
 
   METHOD is_attached.
+    " a segment is attached unless it or one of its ancestors was removed
     DATA(node) = segment.
-    WHILE node->parent_segment IS BOUND.
-      IF NOT line_exists( node->parent_segment->child_segments[ table_line = node ] ).
+    WHILE node IS BOUND.
+      IF node->is_removed = abap_true.
         RETURN.
       ENDIF.
       node = node->parent_segment.
     ENDWHILE.
-    result = xsdbool( line_exists( top_segments[ table_line = node ] ) ).
+    result = abap_true.
   ENDMETHOD.
 
 
@@ -877,10 +901,10 @@ CLASS ZCL_IDOCTOR IMPLEMENTATION.
 
   METHOD number_segments.
     LOOP AT segments INTO DATA(segment).
+      INSERT segment INTO TABLE numbering-ordered.
       INSERT VALUE #( segment = segment
-                      number  = lines( numbers ) + 1 ) INTO TABLE numbers.
-      number_segments( EXPORTING segments = segment->child_segments
-                       CHANGING  numbers  = numbers ).
+                      number  = lines( numbering-ordered ) ) INTO TABLE numbering-numbers.
+      number_segments( segment->child_segments ).
     ENDLOOP.
   ENDMETHOD.
 
@@ -944,12 +968,14 @@ CLASS ZCL_IDOCTOR IMPLEMENTATION.
 
 
   METHOD control_xml.
+    DATA(newline) = cl_abap_char_utilities=>newline.
     DATA(control) = flat_control( ).
     DATA(structure) = CAST cl_abap_structdescr( cl_abap_typedescr=>describe_by_data( control ) ).
     " the control record is character-like, so each field is a slice of its fixed-length line
-    DATA(line) = fixed_width( control ).
+    DATA(line) = fixed_width( record = control
+                              width  = width_of( control ) ).
     DATA(offset) = 0.
-    result = |{ indentation( level ) }<{ control_record_name } SEGMENT="1">{ cl_abap_char_utilities=>newline }|.
+    INSERT |{ indentation( level ) }<{ control_record_name } SEGMENT="1">{ newline }| INTO TABLE xml_lines.
     LOOP AT structure->components INTO DATA(component).
       DATA(length) = component-length / cl_abap_char_utilities=>charsize.
       DATA(value) = condense( val = substring( val = line
@@ -957,13 +983,13 @@ CLASS ZCL_IDOCTOR IMPLEMENTATION.
                                                len = length )
                               del = ` ` ).
       IF value CN ` 0`.
-        result = result && xml_element( name  = component-name
-                                        value = value
-                                        level = level + 1 ).
+        INSERT xml_element( name  = component-name
+                            value = value
+                            level = level + 1 ) INTO TABLE xml_lines.
       ENDIF.
       offset = offset + length.
     ENDLOOP.
-    result = |{ result }{ indentation( level ) }</{ control_record_name }>{ cl_abap_char_utilities=>newline }|.
+    INSERT |{ indentation( level ) }</{ control_record_name }>{ newline }| INTO TABLE xml_lines.
   ENDMETHOD.
 
 
@@ -974,9 +1000,9 @@ CLASS ZCL_IDOCTOR IMPLEMENTATION.
     LOOP AT fields INTO DATA(field).
       DATA(value) = CONV string( segment->sdata+field-offset(field-length) ).
       IF value IS NOT INITIAL.
-        result = result && xml_element( name  = field-field_name
-                                        value = value
-                                        level = level ).
+        INSERT xml_element( name  = field-field_name
+                            value = value
+                            level = level ) INTO TABLE xml_lines.
       ENDIF.
     ENDLOOP.
   ENDMETHOD.
@@ -984,8 +1010,9 @@ CLASS ZCL_IDOCTOR IMPLEMENTATION.
 
   METHOD find_by_number.
     DATA(segment_number) = CONV edidd-segnum( number ).
-    DATA(numbers) = segment_numbers( ).
-    result = VALUE #( numbers[ number = segment_number ]-segment OPTIONAL ).
+    refresh_numbering( ).
+    DATA(index) = CONV i( segment_number ).
+    result = VALUE #( numbering-ordered[ index ] OPTIONAL ).
     IF result IS NOT BOUND.
       RAISE EXCEPTION TYPE zcx_idoctor_error MESSAGE e016(zidoctor) WITH segment_number.
     ENDIF.
@@ -997,12 +1024,6 @@ CLASS ZCL_IDOCTOR IMPLEMENTATION.
     DATA line TYPE c LENGTH 1100.
 
     line = record.
-    " the width is the sum of the field lengths, so that trailing blank fields are kept
-    DATA(structure) = CAST cl_abap_structdescr( cl_abap_typedescr=>describe_by_data( record ) ).
-    DATA(width) = 0.
-    LOOP AT structure->components INTO DATA(component).
-      width = width + component-length / cl_abap_char_utilities=>charsize.
-    ENDLOOP.
     result = |{ line WIDTH = width }|.
   ENDMETHOD.
 
@@ -1031,8 +1052,8 @@ CLASS ZCL_IDOCTOR IMPLEMENTATION.
 
   METHOD number_of.
     check_attached( segment ).
-    DATA(numbers) = segment_numbers( ).
-    result = numbers[ segment = segment ]-number.
+    refresh_numbering( ).
+    result = numbering-numbers[ segment = segment ]-number.
   ENDMETHOD.
 
 
@@ -1040,47 +1061,56 @@ CLASS ZCL_IDOCTOR IMPLEMENTATION.
     DATA(newline) = cl_abap_char_utilities=>newline.
     LOOP AT segments INTO DATA(segment).
       DATA(name) = xml_name( segment->definition-segment_type ).
-      result = |{ result }{ indentation( level ) }<{ name } SEGMENT="1">{ newline }|
-            && fields_xml( segment = segment
-                           level   = level + 1 )
-            && segments_xml( segments = segment->child_segments
-                             level    = level + 1 )
-            && |{ indentation( level ) }</{ name }>{ newline }|.
+      INSERT |{ indentation( level ) }<{ name } SEGMENT="1">{ newline }| INTO TABLE xml_lines.
+      fields_xml( EXPORTING segment   = segment
+                            level     = level + 1
+                  CHANGING  xml_lines = xml_lines ).
+      segments_xml( EXPORTING segments  = segment->child_segments
+                              level     = level + 1
+                    CHANGING  xml_lines = xml_lines ).
+      INSERT |{ indentation( level ) }</{ name }>{ newline }| INTO TABLE xml_lines.
     ENDLOOP.
-  ENDMETHOD.
-
-
-  METHOD segment_numbers.
-    " numbered as append_records( ) numbers the data records: depth first, in document order
-    number_segments( EXPORTING segments = top_segments
-                     CHANGING  numbers  = result ).
   ENDMETHOD.
 
 
   METHOD to_flat_file.
+    DATA file_lines TYPE string_table.
+
     DATA(separator) = COND string( WHEN line_break IS SUPPLIED THEN line_break
                                    ELSE cl_abap_char_utilities=>newline ).
-    result = |{ fixed_width( flat_control( ) ) }{ separator }|.
+    DATA(control) = flat_control( ).
+    INSERT |{ fixed_width( record = control
+                           width  = width_of( control ) ) }{ separator }| INTO TABLE file_lines.
+    DATA(data_width) = width_of( VALUE edi_dd40( ) ).
     DATA(records) = to_edidd( ).
     LOOP AT records INTO DATA(record).
       DATA(data_record) = CORRESPONDING edi_dd40( record ).
       data_record-segnam = flat_segment_name( record-segnam ).
-      result = |{ result }{ fixed_width( data_record ) }{ separator }|.
+      INSERT |{ fixed_width( record = data_record
+                             width  = data_width ) }{ separator }| INTO TABLE file_lines.
     ENDLOOP.
+    " one concatenation at the end - appending to a growing string would copy it per record
+    result = concat_lines_of( file_lines ).
   ENDMETHOD.
 
 
   METHOD to_xml.
+    DATA xml_lines TYPE string_table.
+
     DATA(newline) = cl_abap_char_utilities=>newline.
     DATA(root) = xml_name( COND string( WHEN control_record-cimtyp IS NOT INITIAL
                                         THEN control_record-cimtyp
                                         ELSE control_record-idoctp ) ).
-    result = |<?xml version="1.0"?>{ newline }<{ root }>{ newline }|
-          && |{ indentation( 1 ) }<IDOC BEGIN="1">{ newline }|
-          && control_xml( 2 )
-          && segments_xml( segments = top_segments
-                           level    = 2 )
-          && |{ indentation( 1 ) }</IDOC>{ newline }</{ root }>{ newline }|.
+    INSERT |<?xml version="1.0"?>{ newline }<{ root }>{ newline }| INTO TABLE xml_lines.
+    INSERT |{ indentation( 1 ) }<IDOC BEGIN="1">{ newline }| INTO TABLE xml_lines.
+    control_xml( EXPORTING level     = 2
+                 CHANGING  xml_lines = xml_lines ).
+    segments_xml( EXPORTING segments  = top_segments
+                            level     = 2
+                  CHANGING  xml_lines = xml_lines ).
+    INSERT |{ indentation( 1 ) }</IDOC>{ newline }</{ root }>{ newline }| INTO TABLE xml_lines.
+    " one concatenation at the end - appending to a growing string would copy it per element
+    result = concat_lines_of( xml_lines ).
   ENDMETHOD.
 
 
@@ -1098,5 +1128,41 @@ CLASS ZCL_IDOCTOR IMPLEMENTATION.
                       sub  = `/`
                       with = `_-`
                       occ  = 0 ).
+  ENDMETHOD.
+
+
+  METHOD position_for.
+    " behind the siblings the syntax puts before or with it, in front of those it puts behind it
+    result = lines( siblings ) + 1.
+    " segments are mostly added in the order of the syntax - then they simply go to the end
+    IF siblings IS INITIAL OR siblings[ result - 1 ]->definition-position <= definition-position.
+      RETURN.
+    ENDIF.
+    LOOP AT siblings INTO DATA(sibling).
+      IF sibling->definition-position > definition-position.
+        result = sy-tabix.
+        RETURN.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+
+  METHOD refresh_numbering.
+    " numbered as append_records( ) numbers the data records: depth first, in document order
+    IF numbering-is_valid = abap_true.
+      RETURN.
+    ENDIF.
+    CLEAR numbering.
+    number_segments( top_segments ).
+    numbering-is_valid = abap_true.
+  ENDMETHOD.
+
+
+  METHOD width_of.
+    " the sum of the field lengths, so that trailing blank fields are kept
+    DATA(structure) = CAST cl_abap_structdescr( cl_abap_typedescr=>describe_by_data( record ) ).
+    LOOP AT structure->components INTO DATA(component).
+      result = result + component-length / cl_abap_char_utilities=>charsize.
+    ENDLOOP.
   ENDMETHOD.
 ENDCLASS.

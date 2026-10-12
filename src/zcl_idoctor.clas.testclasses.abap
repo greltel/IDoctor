@@ -91,6 +91,9 @@ CLASS ltc_idoctor DEFINITION FINAL FOR TESTING
     METHODS when_removed_then_subtree_gone FOR TESTING RAISING cx_static_check.
     METHODS given_no_schedule_then_finding FOR TESTING RAISING cx_static_check.
     METHODS given_namespace_xml_names FOR TESTING RAISING cx_static_check.
+    METHODS given_numbered_insert_renumber FOR TESTING RAISING cx_static_check.
+    METHODS given_numbered_remove_renumber FOR TESTING RAISING cx_static_check.
+    METHODS given_removed_parent_child_out FOR TESTING RAISING cx_static_check.
 
     METHODS valid_idoc
       RETURNING VALUE(result) TYPE REF TO zcl_idoctor
@@ -649,6 +652,60 @@ CLASS ltc_idoctor IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true( act = xsdbool( xml CS `<_-ABC_-Z1HEAD SEGMENT="1">`
                                                  AND xml CS `</_-ABC_-Z1HEAD>` )
                                       msg = `A namespace segment must be written with _- for each slash` ).
+  ENDMETHOD.
+
+
+  METHOD given_numbered_insert_renumber.
+    DATA(idoc) = valid_idoc( ).
+    DATA(second_item) = idoc->find_by_number( '000006' ).
+
+    " the numbers are known now - an insertion in front must renew them
+    idoc->find_first( 'Z1PARTNER' )->insert_after( 'Z1PARTNER' ).
+
+    cl_abap_unit_assert=>assert_equals( act = second_item->number( )
+                                        exp = '000007'
+                                        msg = `The second item must move up behind the new partner` ).
+    cl_abap_unit_assert=>assert_equals( act = idoc->find_by_number( '000007' )
+                                        exp = second_item
+                                        msg = `Number 7 must lead to the moved item` ).
+  ENDMETHOD.
+
+
+  METHOD given_numbered_remove_renumber.
+    DATA(idoc) = valid_idoc( ).
+    DATA(total) = idoc->find_by_number( '000008' ).
+
+    idoc->find_first( 'Z1ITEM' )->remove( ).
+
+    cl_abap_unit_assert=>assert_equals( act = total->number( )
+                                        exp = '000005'
+                                        msg = `The total must move down by the three removed segments` ).
+    TRY.
+        idoc->find_by_number( '000008' ).
+        cl_abap_unit_assert=>fail( msg = `Number 8 must no longer exist` ).
+      CATCH zcx_idoctor_error INTO DATA(error).
+        cl_abap_unit_assert=>assert_equals( act = error->if_t100_message~t100key-msgno
+                                            exp = '016'
+                                            msg = `Wrong error - expected: no segment with that number` ).
+    ENDTRY.
+  ENDMETHOD.
+
+
+  METHOD given_removed_parent_child_out.
+    DATA(idoc) = valid_idoc( ).
+    DATA(item) = idoc->find_first( 'Z1ITEM' ).
+    DATA(text) = item->find_first( 'Z1ITEMTEXT' ).
+
+    item->remove( ).
+
+    TRY.
+        text->add( 'Z1ITEMTEXT' ).
+        cl_abap_unit_assert=>fail( msg = `A segment below a removed one must count as removed` ).
+      CATCH zcx_idoctor_error INTO DATA(error).
+        cl_abap_unit_assert=>assert_equals( act = error->if_t100_message~t100key-msgno
+                                            exp = '011'
+                                            msg = `Wrong error - expected: no longer part of the IDoc` ).
+    ENDTRY.
   ENDMETHOD.
 
 

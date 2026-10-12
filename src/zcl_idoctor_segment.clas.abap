@@ -174,6 +174,8 @@ CLASS zcl_idoctor_segment DEFINITION
     DATA parent_segment TYPE REF TO zcl_idoctor_segment.
     DATA child_segments TYPE zcl_idoctor=>ty_segments.
     DATA sdata TYPE edidd-sdata.
+    " set by the IDoc when the segment is removed - the segments below it go with it
+    DATA is_removed TYPE abap_bool.
 
     METHODS collect
       IMPORTING query   TYPE zcl_idoctor=>ty_query

@@ -83,6 +83,14 @@ CLASS lcl_bulk_fix DEFINITION FINAL.
       RETURNING VALUE(result) TYPE ty_results.
 
   PRIVATE SECTION.
+    CONSTANTS:
+      BEGIN OF authority,
+        object      TYPE xuobject VALUE 'S_IDOCMONI',
+        change      TYPE activ_auth VALUE '02',
+        transaction TYPE sytcode VALUE 'WE02',
+      END OF authority.
+    CONSTANTS direction_inbound TYPE edidc-direct VALUE '2'.
+
     DATA repository TYPE REF TO zif_idoctor_repository.
 
     METHODS fix_one
@@ -94,6 +102,10 @@ CLASS lcl_bulk_fix DEFINITION FINAL.
       IMPORTING docnum        TYPE edidc-docnum
                 fix           TYPE ty_fix
       RETURNING VALUE(result) TYPE i
+      RAISING   zcx_idoctor_error.
+
+    METHODS check_authority
+      IMPORTING control TYPE edidc
       RAISING   zcx_idoctor_error.
 ENDCLASS.
 
@@ -145,8 +157,30 @@ CLASS lcl_bulk_fix IMPLEMENTATION.
     ENDLOOP.
     result = lines( segments ).
     IF result > 0 AND fix-is_test = abap_false.
+      check_authority( idoc->control( ) ).
       repository->save( idoc     = idoc
                         settings = VALUE #( commit = abap_true ) ).
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD check_authority.
+    " neither IDoctor nor SAP's IDoc edit interface checks authorizations - the program that
+    " saves does: here the right to change the IDoc in WE02 (verify the values in SU21)
+    DATA(is_inbound) = xsdbool( control-direct = direction_inbound ).
+    DATA(partner) = COND edidc-sndprn( WHEN is_inbound = abap_true THEN control-sndprn
+                                       ELSE control-rcvprn ).
+    DATA(partner_type) = COND edidc-sndprt( WHEN is_inbound = abap_true THEN control-sndprt
+                                            ELSE control-rcvprt ).
+    AUTHORITY-CHECK OBJECT authority-object
+      ID 'ACTVT'   FIELD authority-change
+      ID 'EDI_DIR' FIELD control-direct
+      ID 'EDI_MES' FIELD control-mestyp
+      ID 'EDI_PRN' FIELD partner
+      ID 'EDI_PRT' FIELD partner_type
+      ID 'EDI_TCD' FIELD authority-transaction.
+    IF sy-subrc <> 0.
+      RAISE EXCEPTION TYPE zcx_idoctor_error MESSAGE e064(zidoctor) WITH control-docnum.
     ENDIF.
   ENDMETHOD.
 

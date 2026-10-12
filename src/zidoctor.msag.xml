@@ -272,6 +272,12 @@
      <MSGNR>063</MSGNR>
      <TEXT>Nothing to change: no segment &amp;1 with &amp;2 = &amp;3</TEXT>
     </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZIDOCTOR</ARBGB>
+     <MSGNR>064</MSGNR>
+     <TEXT>No authorization to change IDoc &amp;1</TEXT>
+    </T100>
    </T100>
   </asx:values>
  </asx:abap>
