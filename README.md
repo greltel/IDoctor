@@ -37,6 +37,7 @@ COMMIT WORK.
 - [Installation](#installation)
 - [Usage](#usage)
 - [Saving IDocs](#saving-idocs)
+- [Security](#security)
 - [Architecture](#architecture)
 - [Extending IDoctor](#extending-idoctor)
 - [Clean core](#clean-core)
@@ -102,7 +103,7 @@ that subpackage if you don't want the demos in your system.
 |---|---|
 | `ZIDOCTOR_DEMO_01` | Build an ORDERS05 IDoc in memory, validate it and list its EDIDD records. Reads and writes no IDoc tables. |
 | `ZIDOCTOR_DEMO_02` | Load one IDoc, change a field in the matching segments and save it. Test mode saves nothing. |
-| `ZIDOCTOR_DEMO_03` | Fix IDocs in error status in bulk: one LUW per IDoc, test mode and a result list. |
+| `ZIDOCTOR_DEMO_03` | Fix IDocs in error status in bulk: one LUW per IDoc, authorization check, test mode and a result list. |
 | `ZIDOCTOR_DEMO_04` | The user exit pattern: add a ship-to partner to the EDIDD records of an ORDERS IDoc and show them before and after. Saves nothing. |
 
 ## Usage
@@ -157,8 +158,9 @@ LOOP AT docnums INTO DATA(docnum).
 ENDLOOP.
 ```
 
-One IDoc is one LUW, so a failure never undoes the IDocs before it. Demo `ZIDOCTOR_DEMO_03`
-adds a selection screen, a test mode and a result list.
+One IDoc is one LUW, so a failure never undoes the IDocs before it. Before saving, check that
+the user may change the IDoc - see [Security](#security). Demo `ZIDOCTOR_DEMO_03` adds a
+selection screen, a test mode, the authorization check and a result list.
 
 ### Build an IDoc from scratch
 
@@ -285,6 +287,28 @@ key says which error it is.
 - **No lost updates.** The IDoc is locked while it is written. If it was changed in the
   database after you loaded it, for example by a user or a reprocessing run, nothing is
   written and you get message `ZIDOCTOR 050`. Load the IDoc again after each save.
+
+## Security
+
+IDoctor checks no authorizations, and neither do the IDoc edit function modules that
+`save( )` calls: whoever can run a program that calls `save( )` can change IDocs through it.
+Reading and building IDocs in memory is harmless; saving is not.
+
+A program that saves IDocs therefore checks, before each `save( )`, that the user may change
+that IDoc - typically with authorization object `S_IDOCMONI`, which also guards changing
+IDocs in WE02:
+
+| Field | Value |
+|---|---|
+| `ACTVT` | `02` (change) |
+| `EDI_DIR` | Direction of the IDoc |
+| `EDI_MES` | Message type |
+| `EDI_PRN` / `EDI_PRT` | Partner and partner type (the sender of an inbound IDoc, the receiver of an outbound one) |
+| `EDI_TCD` | Transaction whose rights apply, e.g. `WE02` |
+
+Verify the fields and values in SU21 for your release. Demo `ZIDOCTOR_DEMO_03` shows the
+check (method `check_authority`); a missing authorization ends with message `ZIDOCTOR 064`
+for that IDoc and leaves it unchanged.
 
 ## Architecture
 
