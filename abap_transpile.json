@@ -2,8 +2,7 @@
   "input_folder": "src",
   "input_filter": [],
   "exclude_filter": [
-    "/demos/",
-    "zcl_idoctor_repository\\.clas\\.testclasses\\.abap$"
+    "/demos/"
   ],
   "output_folder": "output",
   "libs": [
@@ -28,6 +27,16 @@
         "object": "ZCL_IDOCTOR",
         "class": "ltc_idoctor",
         "method": "given_special_chars_xml_escape"
+      },
+      {
+        "object": "ZCL_IDOCTOR_REPOSITORY",
+        "class": "ltc_repository",
+        "method": "given_new_segment_save_raises"
+      },
+      {
+        "object": "ZCL_IDOCTOR_REPOSITORY",
+        "class": "ltc_repository",
+        "method": "given_db_change_save_raises"
       }
     ]
   }

@@ -20,7 +20,7 @@
   "devDependencies": {
     "@abaplint/runtime": "^2.14.3",
     "@abaplint/transpiler-cli": "^2.14.3",
-    "open-abap-core": "github:open-abap/open-abap-core#88e7958394cc9f76151491959b961a546fc0cdea",
+    "open-abap-core": "github:open-abap/open-abap-core#f15bfafcf480e36c4b4debf56f32b9a43d7635d4",
     "rimraf": "^6.0.1"
   }
 }

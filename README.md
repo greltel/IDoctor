@@ -432,8 +432,8 @@ the SAP standard classes they use. Locally: `npm ci`, then `npm test`.
 
 | Test | Reason |
 |---|---|
-| `ZCL_IDOCTOR`: `given_special_chars_xml_escape` | `escape( )` with `cl_abap_format=>e_xml_text` is not in the transpiler runtime yet |
-| The tests of `ZCL_IDOCTOR_REPOSITORY` | They need configurations and `verify( )` of the function module test doubles, which open-abap-core does not have yet |
+| `ZCL_IDOCTOR`: `given_special_chars_xml_escape` | `escape( )` with `cl_abap_format=>e_xml_text` is in the transpiler runtime from the release after 2.14.3 |
+| `ZCL_IDOCTOR_REPOSITORY`: `given_new_segment_save_raises`, `given_db_change_save_raises` | The transpiler does not run `CLEANUP` yet ([abaplint/transpiler#1993](https://github.com/abaplint/transpiler/pull/1993)) |
 
 ## Messages
 
