@@ -3,8 +3,8 @@ updates:
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: cron
-      cronjob: "0 16 * * *"
+      interval: daily
+      time: "16:00"
       timezone: Europe/Athens
     cooldown:
       exclude:
@@ -16,8 +16,8 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: cron
-      cronjob: "0 16 * * *"
+      interval: daily
+      time: "16:00"
       timezone: Europe/Athens
     cooldown:
       exclude:
