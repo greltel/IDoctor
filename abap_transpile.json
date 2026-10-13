@@ -24,11 +24,6 @@
     "unknownTypes": "compileError",
     "skip": [
       {
-        "object": "ZCL_IDOCTOR",
-        "class": "ltc_idoctor",
-        "method": "given_special_chars_xml_escape"
-      },
-      {
         "object": "ZCL_IDOCTOR_REPOSITORY",
         "class": "ltc_repository",
         "method": "given_new_segment_save_raises"
