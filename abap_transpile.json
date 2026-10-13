@@ -21,18 +21,6 @@
     "ignoreSyntaxCheck": false,
     "addFilenames": true,
     "addCommonJS": true,
-    "unknownTypes": "compileError",
-    "skip": [
-      {
-        "object": "ZCL_IDOCTOR_REPOSITORY",
-        "class": "ltc_repository",
-        "method": "given_new_segment_save_raises"
-      },
-      {
-        "object": "ZCL_IDOCTOR_REPOSITORY",
-        "class": "ltc_repository",
-        "method": "given_db_change_save_raises"
-      }
-    ]
+    "unknownTypes": "compileError"
   }
 }
