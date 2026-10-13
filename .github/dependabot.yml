@@ -1,0 +1,24 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: cron
+      cronjob: "0 16 * * *"
+      timezone: Europe/Athens
+    cooldown:
+      exclude:
+        - "*"
+    groups:
+      abaplint:
+        patterns:
+          - "@abaplint/*"
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: cron
+      cronjob: "0 16 * * *"
+      timezone: Europe/Athens
+    cooldown:
+      exclude:
+        - "*"
