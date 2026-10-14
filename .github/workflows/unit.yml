@@ -1,4 +1,4 @@
-name: unit tests
+name: ABAP Unit Testing
 
 # Runs the ABAP Unit tests off-stack: the classes are transpiled to JavaScript with the
 # abaplint transpiler and run on Node.js against open-abap-core, which npm ci installs.
@@ -10,6 +10,7 @@ on:
 
 jobs:
   unit:
+    name: Transpile and run ABAP Unit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
